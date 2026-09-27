@@ -81,6 +81,21 @@ class _Silencioso(SimpleHTTPRequestHandler):
         pass
 
 
+class _Redirecionavel(_Silencioso):
+    """Serve docs/ até ganhar um destino e daí redireciona tudo para ele, como o GitHub
+    Pages faz com o caminho antigo quando o repositório passa a ter domínio próprio."""
+
+    destino: str | None = None
+
+    def do_GET(self) -> None:
+        if self.destino:
+            self.send_response(301)
+            self.send_header("Location", self.destino + self.path.lstrip("/"))
+            self.end_headers()
+            return
+        super().do_GET()
+
+
 @pytest.fixture
 def servidor() -> Iterator[ThreadingHTTPServer]:
     """Serve docs/ como o GitHub Pages serve, numa porta livre. Um por teste: o teste
@@ -263,3 +278,41 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     assert "Item_Nivel1" in _copiar(pagina)
 
     assert erros == []
+
+
+def test_troca_de_dominio_leva_ao_endereco_novo_e_desliga_o_service_worker(
+    contexto: object, endereco: str
+) -> None:
+    """Com o domínio próprio, o GitHub Pages redireciona o endereço antigo, inclusive o
+    sw.js. O service worker antigo tem de repassar o redirecionamento ao navegador e sair
+    do caminho: seguido por ele, a página não abria, e o navegador não o atualiza por um
+    redirecionamento. Os dois servidores locais, em portas diferentes, são duas origens."""
+    antigo_handler = type("_Antigo", (_Redirecionavel,), {"destino": None})
+    antigo = ThreadingHTTPServer(("127.0.0.1", 0), partial(antigo_handler, directory=str(DOCS)))
+    threading.Thread(target=antigo.serve_forever, daemon=True).start()
+    endereco_antigo = f"http://127.0.0.1:{antigo.server_address[1]}/"
+    # O teste é do service worker: o Pyodide não precisa carregar
+    contexto.route("https://cdn.jsdelivr.net/**", lambda rota: rota.abort())  # type: ignore[attr-defined]
+    try:
+        pagina = contexto.new_page()  # type: ignore[attr-defined]
+        pagina.goto(endereco_antigo)
+        pagina.wait_for_function(
+            "() => navigator.serviceWorker.controller !== null", timeout=PRAZO_CONVERSAO_MS
+        )
+
+        antigo_handler.destino = endereco
+        pagina.goto(endereco_antigo)
+        assert pagina.url.startswith(endereco)
+
+        # De volta ao endereço antigo, fora da página: sem service worker, o servidor
+        # responde direto, e o 404 prova que nada mais intercepta a navegação
+        antigo_handler.destino = None
+        resposta = pagina.goto(endereco_antigo + "nao-existe")
+        assert resposta.status == 404
+        assert pagina.evaluate("async () => (await navigator.serviceWorker.getRegistrations()).length") == 0
+        assert pagina.evaluate(
+            "async () => (await caches.keys()).filter(n => n.startsWith('conversao-sei-')).length"
+        ) == 0
+    finally:
+        antigo.shutdown()
+        antigo.server_close()

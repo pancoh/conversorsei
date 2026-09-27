@@ -120,12 +120,34 @@ async function cachePrimeiro(requisicao, nomeCache) {
   return guardar(nomeCache, requisicao, resposta);
 }
 
+// A página mudou de endereço: o servidor redireciona toda a pasta para o domínio novo.
+// Este service worker apaga o próprio cache e sai do caminho, e o endereço antigo passa a
+// ir direto ao redirecionamento. Depois dele o navegador nunca mais o atualizaria: não
+// aceita buscar sw.js por um redirecionamento
+async function desligar() {
+  const nomes = await caches.keys();
+  await Promise.all(nomes.filter((n) => n.startsWith(PREFIXO_CACHE)).map((n) => caches.delete(n)));
+  await self.registration.unregister();
+}
+
 // Rede primeiro, confirmando com o servidor e não com o cache HTTP ('no-cache': quando
 // nada mudou, a resposta é um 304 curto). Sem rede, serve o que está guardado.
 async function redePrimeiro(requisicao, reserva) {
+  // Na navegação, o redirecionamento volta ao navegador como veio ('manual'), e é ele quem
+  // o segue. Seguido aqui, a resposta chegava à navegação já redirecionada, e o navegador
+  // a recusa: a página não abria
+  const navegacao = requisicao.mode === 'navigate';
   let resposta = null;
   try {
-    resposta = await fetch(requisicao.url, { cache: 'no-cache', credentials: 'same-origin' });
+    resposta = await fetch(requisicao.url, {
+      cache: 'no-cache',
+      credentials: 'same-origin',
+      redirect: navegacao ? 'manual' : 'follow',
+    });
+    if (resposta.type === 'opaqueredirect') {
+      await desligar();
+      return resposta;
+    }
     if (resposta.ok) return guardar(CACHE_ESTATICO, semBusca(requisicao), resposta);
   } catch {
     // Sem rede: segue para o que está guardado
