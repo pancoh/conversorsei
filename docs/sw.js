@@ -56,9 +56,10 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Apaga só as versões antigas dos próprios caches. O domínio (ramson.com.br) é compartilhado
-// com outros sites, e o cache é por domínio: sem o prefixo, a ativação apagava o cache de
-// qualquer outro site ali, e o da própria página quando ela mudou de caminho
+// Apaga só as versões antigas dos próprios caches. O prefixo vem do tempo em que a página
+// dividia o domínio ramson.com.br com outros sites, e o cache é por domínio: sem ele, a
+// ativação apagava o cache de qualquer outro site ali. Fica no domínio próprio porque, no
+// endereço antigo, desligar ainda apaga por ele
 const PREFIXO_CACHE = 'conversao-sei-';
 // Ligado quando a página muda de endereço (desligar): daí em diante nada entra no cache
 let desligado = false;

@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://ramson.com.br/conversorsei/">
+  <a href="https://conversorsei.com.br/">
     <img src="docs/icons/marca-conversor.svg" width="112" height="112" alt="Logo do Conversor SEI">
   </a>
 </p>
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://ramson.com.br/conversorsei/"><strong>Abrir o conversor</strong></a>
+  <a href="https://conversorsei.com.br/"><strong>Abrir o conversor</strong></a>
   &nbsp;·&nbsp;
   <a href="#uso">Como usar</a>
   &nbsp;·&nbsp;
@@ -46,7 +46,7 @@ do SEI e você cola o resultado pronto no editor.
 </p>
 
 > **Não precisa instalar nada.** Basta abrir
-> [ramson.com.br/conversorsei](https://ramson.com.br/conversorsei/) no navegador.
+> [conversorsei.com.br](https://conversorsei.com.br/) no navegador.
 
 ## <img src=".github/readme/por-que-usar.svg" width="24" height="24" alt=""> Por que usar
 
@@ -75,7 +75,7 @@ por um programa de OCR.
 
 ## <img src=".github/readme/como-usar.svg" width="24" height="24" alt=""> Como usar
 
-1. Abra [ramson.com.br/conversorsei](https://ramson.com.br/conversorsei/).
+1. Abra [conversorsei.com.br](https://conversorsei.com.br/).
 2. Arraste o documento para a página ou clique para escolher o arquivo.
 3. Clique em **Copiar para o SEI**.
 4. No SEI, abra o editor, clique no corpo do documento e cole com `Ctrl+V` (no Mac, `Cmd+V`).
