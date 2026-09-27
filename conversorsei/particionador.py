@@ -86,6 +86,11 @@ def montar_html(corpo_html: str, css: str | None = None, contadores: dict[str, i
     """
     css_content = css if css is not None else css_institucional()
     counter_reset = formatar_counter_reset(contadores)
+    # Os contadores nascem no body::before, irmão dos parágrafos, e não no body. Pela regra
+    # de herança de contadores do CSS, o contador do pai encobre o que um irmão anterior
+    # criou com o mesmo nome: com o reset no body, o Chrome ignorava o counter-reset de cada
+    # Item_Nivel1 e emendava os subitens (2.3 logo depois de 2.). O comentário fica aqui, e
+    # não no <style>, para não ir em cada arquivo gerado nem gastar o orçamento da parte.
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -94,8 +99,6 @@ def montar_html(corpo_html: str, css: str | None = None, contadores: dict[str, i
 <style>
 body {{font-family:Calibri, sans-serif; font-size:12pt; color:#000; background:#fff;
       max-width:19cm; margin:1.5em auto; padding:0 1em;}}
-/* Os contadores nascem num irmão dos parágrafos, e não no body: com eles no body, o Chrome
-   ignora o counter-reset de cada Item_Nivel1 e emenda os subitens (2.3 logo depois de 2.) */
 body::before {{content:""; display:block; counter-reset:{counter_reset};}}
 table {{border-collapse:collapse;}}
 ul {{margin:6pt 6pt 6pt 40px; padding-left:20px;}}
