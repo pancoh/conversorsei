@@ -25,6 +25,10 @@
   <img src="https://img.shields.io/badge/gratuito-sem%20cadastro-91BB25" alt="Gratuito e sem cadastro">
 </p>
 
+<p align="center">
+  <img src=".github/readme/resultado.png" width="760" alt="Tela do Conversor SEI com um documento convertido e o botão Copiar para o SEI">
+</p>
+
 ---
 
 ## Para que serve
@@ -34,6 +38,12 @@ tabelas ficam tortas e os parágrafos saem fora do padrão. Depois, é preciso a
 
 O Conversor SEI faz esse ajuste por você. Você envia o documento, o conversor aplica os estilos
 do SEI e você cola o resultado pronto no editor.
+
+<p align="center">
+  <img src=".github/readme/previa.png" width="760" alt="Prévia de uma nota técnica convertida, com itens numerados, lista e tabela no padrão do SEI">
+  <br>
+  <sub>Prévia de um documento convertido: títulos numerados, subitens, lista e tabela no padrão do SEI.</sub>
+</p>
 
 > **Não precisa instalar nada.** Basta abrir
 > [ramson.com.br/conversorsei](https://ramson.com.br/conversorsei/) no navegador.
