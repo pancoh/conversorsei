@@ -32,6 +32,8 @@ DOCS = Path(__file__).resolve().parent.parent / "docs"
 # O Pyodide vem do CDN na primeira visita: em rede lenta, o carregamento passa de um minuto
 PRAZO_CARREGAMENTO_MS = 240_000
 PRAZO_CONVERSAO_MS = 60_000
+# Atraso dos arquivos lentos no teste da troca de domínio
+ATRASO_S = 2
 PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
 # O que a página precisa do CDN para abrir e converter sem rede
 ARQUIVOS_DO_PYODIDE = [
@@ -86,6 +88,8 @@ class _Redirecionavel(_Silencioso):
     Pages faz com o caminho antigo quando o repositório passa a ter domínio próprio."""
 
     destino: str | None = None
+    # Caminhos servidos com atraso, para a troca acontecer com a gravação no cache em curso
+    lentos: frozenset[str] = frozenset()
 
     def do_GET(self) -> None:
         if self.destino:
@@ -93,6 +97,8 @@ class _Redirecionavel(_Silencioso):
             self.send_header("Location", self.destino + self.path.lstrip("/"))
             self.end_headers()
             return
+        if self.path.split("?")[0] in self.lentos:
+            time.sleep(ATRASO_S)
         super().do_GET()
 
 
@@ -299,20 +305,30 @@ def test_troca_de_dominio_leva_ao_endereco_novo_e_desliga_o_service_worker(
         pagina.wait_for_function(
             "() => navigator.serviceWorker.controller !== null", timeout=PRAZO_CONVERSAO_MS
         )
+        _esperar_no_cache(pagina, "index.html")
+
+        # Gravações em curso na hora da troca: o reparo do cache, que roda no service
+        # worker, e uma busca da página. As duas terminam depois do desligamento
+        antigo_handler.lentos = frozenset({"/index.html", "/manifest.webmanifest"})
+        assert pagina.evaluate(APAGAR_DO_CACHE, "index.html")
+        pagina.evaluate("() => navigator.serviceWorker.controller.postMessage({tipo: 'reparar-cache-essencial'})")
+        pagina.evaluate("() => { fetch('manifest.webmanifest?lento'); }")
+        time.sleep(0.5)
 
         antigo_handler.destino = endereco
         pagina.goto(endereco_antigo)
         assert pagina.url.startswith(endereco)
+        time.sleep(ATRASO_S + 1)
 
         # De volta ao endereço antigo, fora da página: sem service worker, o servidor
         # responde direto, e o 404 prova que nada mais intercepta a navegação
         antigo_handler.destino = None
+        antigo_handler.lentos = frozenset()
         resposta = pagina.goto(endereco_antigo + "nao-existe")
         assert resposta.status == 404
         assert pagina.evaluate("async () => (await navigator.serviceWorker.getRegistrations()).length") == 0
-        assert pagina.evaluate(
-            "async () => (await caches.keys()).filter(n => n.startsWith('conversao-sei-')).length"
-        ) == 0
+        restantes = pagina.evaluate("async () => (await caches.keys()).filter(n => n.startsWith('conversao-sei-'))")
+        assert restantes == [], f"Caches que sobraram no endereço antigo: {restantes}"
     finally:
         antigo.shutdown()
         antigo.server_close()

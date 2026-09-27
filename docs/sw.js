@@ -60,6 +60,8 @@ self.addEventListener('install', (event) => {
 // com outros sites, e o cache é por domínio: sem o prefixo, a ativação apagava o cache de
 // qualquer outro site ali, e o da própria página quando ela mudou de caminho
 const PREFIXO_CACHE = 'conversao-sei-';
+// Ligado quando a página muda de endereço (desligar): daí em diante nada entra no cache
+let desligado = false;
 
 self.addEventListener('activate', (event) => {
   const atuais = [CACHE_ESTATICO, CACHE_EXECUCAO];
@@ -76,6 +78,7 @@ self.addEventListener('activate', (event) => {
 // preparar o conversor, tenta completar as entradas ausentes enquanto há rede: os
 // arquivos do site e o núcleo do Pyodide.
 async function completar(nomeCache, urls, opcoes) {
+  if (desligado) return;
   const cache = await caches.open(nomeCache);
   await Promise.allSettled(urls.map(async (url) => {
     if (await cache.match(url)) return;
@@ -98,7 +101,7 @@ self.addEventListener('message', (event) => {
 
 // Guarda no cache apenas resposta utilizável: erro e resposta parcial ficam de fora
 async function guardar(nomeCache, requisicao, resposta) {
-  if (!resposta || !resposta.ok || resposta.status === 206) return resposta;
+  if (desligado || !resposta || !resposta.ok || resposta.status === 206) return resposta;
   const cache = await caches.open(nomeCache);
   await cache.put(requisicao, resposta.clone());
   return resposta;
@@ -123,11 +126,20 @@ async function cachePrimeiro(requisicao, nomeCache) {
 // A página mudou de endereço: o servidor redireciona toda a pasta para o domínio novo.
 // Este service worker apaga o próprio cache e sai do caminho, e o endereço antigo passa a
 // ir direto ao redirecionamento. Depois dele o navegador nunca mais o atualizaria: não
-// aceita buscar sw.js por um redirecionamento
-async function desligar() {
+// aceita buscar sw.js por um redirecionamento.
+// A página antiga ainda pode ter buscas em andamento, e cada uma, ao terminar, abria o
+// cache de novo (caches.open recria o que foi apagado). Por isso a marca vem antes, e a
+// limpeza se repete depois do unregister, para pegar o que já tinha passado pela marca
+async function apagarCaches() {
   const nomes = await caches.keys();
   await Promise.all(nomes.filter((n) => n.startsWith(PREFIXO_CACHE)).map((n) => caches.delete(n)));
+}
+
+async function desligar() {
+  desligado = true;
+  await apagarCaches();
   await self.registration.unregister();
+  await apagarCaches();
 }
 
 // Rede primeiro, confirmando com o servidor e não com o cache HTTP ('no-cache': quando
