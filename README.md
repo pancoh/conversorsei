@@ -163,8 +163,9 @@ O GitHub Actions roda todas as verificações e só publica a página se elas pa
 
 ## <img src=".github/readme/privacidade.svg" width="24" height="24" alt=""> Privacidade
 
-A página conta visitas e conversões pelo GoatCounter, sem cookies. De cada conversão vão só a
-extensão do arquivo e o resultado, nunca o nome ou o conteúdo do documento.
+A página registra estatísticas anônimas de uso pelo GoatCounter, sem cookies: número de
+acessos, formato dos arquivos convertidos e resultado da conversão. O nome e o conteúdo dos
+documentos nunca são registrados.
 
 ## <img src=".github/readme/apoio.svg" width="24" height="24" alt=""> Apoie o projeto
 
