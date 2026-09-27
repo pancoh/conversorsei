@@ -28,6 +28,7 @@ const statusSpinner = document.getElementById('status-spinner');
 const statusTitle = document.getElementById('status-title');
 const statusDesc = document.getElementById('status-desc');
 const statusRelato = document.getElementById('status-relato');
+const statusOcr = document.getElementById('status-ocr');
 
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
@@ -674,6 +675,7 @@ function reativarResultado() {
 // Estados do cartão de status
 function mostrarStatusProcessando(titulo) {
   statusRelato.classList.add('hidden');
+  statusOcr.classList.add('hidden');
   pyodideStatusCard.className = 'bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
   statusSpinner.className = 'animate-spin text-blue-600';
   statusSpinner.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5"></i>';
@@ -689,6 +691,7 @@ function mostrarStatusProcessando(titulo) {
 // na descrição ao mesmo tempo
 function mostrarStatusDiscreto(texto) {
   statusRelato.classList.add('hidden');
+  statusOcr.classList.add('hidden');
   pyodideStatusCard.className = 'flex items-center px-1';
   statusSpinner.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-emerald-700"></i>';
   statusSpinner.className = '';
@@ -698,9 +701,14 @@ function mostrarStatusDiscreto(texto) {
   refreshIcons();
 }
 
+// Trecho da mensagem do pdf_converter para o PDF sem camada de texto. O teste
+// test_mensagem_do_pdf_sem_texto_aciona_as_opcoes_de_ocr confere que os dois batem
+const MARCA_PDF_SEM_TEXTO = 'não tem camada de texto';
+
 function mostrarStatusErro(titulo, descricao) {
   registrarParaRelato(titulo, [descricao]);
   statusRelato.classList.remove('hidden');
+  statusOcr.classList.toggle('hidden', !String(descricao || '').includes(MARCA_PDF_SEM_TEXTO));
   pyodideStatusCard.className = 'bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
   statusSpinner.innerHTML = '<i data-lucide="alert-circle" class="w-5 h-5 text-rose-600"></i>';
   statusSpinner.className = '';
@@ -710,6 +718,17 @@ function mostrarStatusErro(titulo, descricao) {
   statusDesc.textContent = descricao || 'Verifique o formato do documento.';
   refreshIcons();
 }
+
+// As opções de OCR ficam abaixo da área de envio, longe do erro, e somem quando a área
+// encolhe depois da primeira conversão. O link as mostra, abre o quadro e rola até ele
+statusOcr.addEventListener('click', (evento) => {
+  evento.preventDefault();
+  const ajuda = document.getElementById('ocr-ajuda');
+  document.getElementById('drop-ajuda').classList.remove('hidden');
+  ajuda.open = true;
+  ajuda.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  ajuda.querySelector('summary').focus({ preventScroll: true });
+});
 
 // Converte um arquivo e devolve o resultado já decodificado do Python
 async function converterArquivo(file, opcoes) {

@@ -92,8 +92,12 @@
         <div>
           <p id="status-title" class="text-sm font-semibold text-blue-900">Preparando o conversor...</p>
           <p id="status-desc" class="text-sm text-blue-700">Na primeira visita, o carregamento leva alguns segundos.</p>
-          <!-- Só aparece em erro de carregamento ou de conversão (ver mostrarStatusErro) -->
-          <a id="status-relato" href="#" data-relato class="hidden text-sm font-semibold text-rose-700 hover:underline">Relatar este problema</a>
+          <!-- Só aparecem em erro de carregamento ou de conversão (ver mostrarStatusErro). As
+               opções de OCR, só no PDF sem camada de texto -->
+          <div class="flex flex-wrap gap-x-3 gap-y-1">
+            <a id="status-ocr" href="#ocr-ajuda" class="hidden text-sm font-semibold text-rose-700 hover:underline">Ver opções de OCR</a>
+            <a id="status-relato" href="#" data-relato class="hidden text-sm font-semibold text-rose-700 hover:underline">Relatar este problema</a>
+          </div>
         </div>
       </div>
     </div>
@@ -417,7 +421,7 @@
   </footer>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=c77b196874"></script>
+  <script src="app.js?v=3089f7ea10"></script>
 
   <!-- Contagem de acessos, sem cookies. Fica fora do service worker: sem rede, a visita
        apenas não é contada, e a página continua abrindo -->
