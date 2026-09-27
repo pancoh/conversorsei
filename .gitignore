@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+# Documentos de trabalho não entram no repositório: a entrada costuma ser
+# documento institucional e a saída é derivada dela.
+dados/*
+!dados/entrada/
+!dados/saida/
+dados/entrada/*
+!dados/entrada/.gitkeep
+dados/saida/*
+!dados/saida/.gitkeep
+# Fallback da CLI quando dados/entrada/ não existe (ver cli.py).
+/entrada/
+/saida/
+.DS_Store

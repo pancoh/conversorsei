@@ -1,0 +1,467 @@
+"""
+core.py — Orquestrador principal de conversão para documentos DOCX, PDF, ODT, MD e TXT.
+"""
+from __future__ import annotations
+
+import html as htmlmod
+import re
+from collections.abc import Iterable
+from contextlib import closing
+from dataclasses import dataclass, field
+from functools import cached_property
+from pathlib import Path
+from zipfile import BadZipFile
+
+from conversao_sei.docx_converter import converter_docx_para_blocos
+from conversao_sei.entrada import FonteDocumento, StreamNomeado
+from conversao_sei.formatacao import CitacaoPorRecuo, trecho_inicial
+from conversao_sei.md_converter import converter_md_para_blocos
+from conversao_sei.odt_converter import converter_odt_para_blocos
+from conversao_sei.particionador import (
+    MAX_KB_PADRAO,
+    avancar_contadores,
+    contadores_zerados,
+    derivar_caminho_saida,
+    dividir_em_partes,
+    limpar_saidas_antigas,
+    montar_html,
+    orcamento_corpo,
+)
+from conversao_sei.pdf_converter import converter_pdf_para_blocos
+from conversao_sei.validador import validar_html_sei
+
+EXTENSOES_SUPORTADAS = {".docx", ".pdf", ".md", ".txt", ".odt"}
+# Formatos de editor que não são aceitos, com a orientação para quem ainda os usa. O .rtf
+# saiu em 2026-09: não havia uso conhecido, e o leitor próprio de RTF era o trecho mais
+# caro de manter. O .doc nunca foi aceito, mas ainda aparece nas pastas de trabalho.
+FORMATOS_RETIRADOS = {
+    ".rtf": "O formato .rtf não é mais aceito: salve o documento como .docx ou .odt.",
+    ".doc": "O formato .doc não é aceito. Abra o arquivo no Word ou LibreOffice e salve como .docx ou .odt.",
+}
+# Extensões que a varredura de pastas e o modo watch enxergam. As não aceitas entram de
+# propósito: viram um resultado com erro e a orientação acima, em vez de serem puladas
+# em silêncio (um .rtf ou .doc deixado na pasta de entrada simplesmente sumiria da conversão).
+EXTENSOES_RECONHECIDAS = frozenset(EXTENSOES_SUPORTADAS | FORMATOS_RETIRADOS.keys())
+
+
+@dataclass
+class ArquivoSEI:
+    """Um arquivo de saída que ainda não foi para o disco."""
+
+    nome: str
+    conteudo: str
+
+    @cached_property
+    def tamanho_bytes(self) -> int:
+        """Tamanho em bytes do conteúdo já codificado, medido uma vez só.
+
+        Quem consome lê o tamanho mais de uma vez (bytes e KB), e recodificar o
+        documento inteiro a cada leitura pesa no navegador.
+        """
+        return len(self.conteudo.encode("utf-8"))
+
+
+@dataclass
+class ResultadoMemoria:
+    """Resultado de uma conversão feita inteiramente em memória."""
+
+    nome_origem: str
+    arquivos: list[ArquivoSEI] = field(default_factory=list)
+    sucesso: bool = True
+    erros: list[str] = field(default_factory=list)
+    avisos: list[str] = field(default_factory=list)
+    # Parágrafos com forma de citação (recuo e fonte menor), convertidos ou não
+    citacoes_por_recuo: int = 0
+    # Início de cada um desses parágrafos, na ordem do documento
+    citacoes_trechos: list[str] = field(default_factory=list)
+    # Início de cada parágrafo antes do item 1 (o cabeçalho), omitido ou não
+    cabecalho_trechos: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ResultadoConversao:
+    arquivo_origem: Path
+    arquivos_gerados: list[Path] = field(default_factory=list)
+    sucesso: bool = True
+    erros: list[str] = field(default_factory=list)
+    avisos: list[str] = field(default_factory=list)
+    # Parágrafos com forma de citação (recuo e fonte menor), convertidos ou não
+    citacoes_por_recuo: int = 0
+    # Início de cada um desses parágrafos, na ordem do documento
+    citacoes_trechos: list[str] = field(default_factory=list)
+    # Início de cada parágrafo antes do item 1 (o cabeçalho), omitido ou não
+    cabecalho_trechos: list[str] = field(default_factory=list)
+
+
+def extrair_blocos_de_fonte(
+    fonte: FonteDocumento,
+    sufixo: str,
+    max_nivel: int = 4,
+    citacao: CitacaoPorRecuo | None = None,
+    avisos: list[str] | None = None,
+) -> list[str]:
+    """Extrai os blocos SEI de um documento, pelo formato indicado no sufixo.
+
+    A fonte pode ser um caminho ou o conteúdo em memória, o que permite à interface web
+    converter os bytes que vêm do navegador sem gravar arquivo temporário. `citacao` só
+    tem efeito em .docx e .odt: Markdown, texto e PDF não têm recuo nem fonte.
+    """
+    sufixo = sufixo.lower()
+
+    if sufixo == ".docx":
+        return converter_docx_para_blocos(fonte, max_nivel=max_nivel, citacao=citacao, avisos=avisos)
+    elif sufixo in {".md", ".txt"}:
+        # .txt não é Markdown: ">", "```" e "~~" ali são texto
+        return converter_md_para_blocos(fonte, max_nivel=max_nivel, estendido=sufixo == ".md", avisos=avisos)
+    elif sufixo == ".pdf":
+        return converter_pdf_para_blocos(fonte, max_nivel=max_nivel)
+    elif sufixo == ".odt":
+        return converter_odt_para_blocos(fonte, max_nivel=max_nivel, citacao=citacao, avisos=avisos)
+    elif sufixo in FORMATOS_RETIRADOS:
+        raise ValueError(FORMATOS_RETIRADOS[sufixo])
+    else:
+        raise ValueError(
+            f"Formato não suportado: '{sufixo}'. Extensões aceitas: {', '.join(sorted(EXTENSOES_SUPORTADAS))}"
+        )
+
+
+def mensagem_erro_de_extracao(nome: str, erro: Exception) -> str:
+    """Troca mensagens de biblioteca por uma orientação que permita tentar de novo."""
+    sufixo = Path(nome).suffix.lower()
+    detalhe = str(erro)
+    if sufixo == ".docx" and (isinstance(erro, BadZipFile) or "File is not a zip file" in detalhe):
+        return (
+            f"Não foi possível abrir {nome}. O arquivo pode estar danificado ou protegido por senha. "
+            "Abra no Word ou LibreOffice, retire a proteção se houver e salve uma nova cópia em .docx."
+        )
+    if sufixo == ".pdf" and "Falha ao extrair texto do PDF" in detalhe:
+        return (
+            f"Não foi possível ler {nome}. O PDF pode estar danificado ou protegido. "
+            "Abra o arquivo e exporte uma nova cópia em PDF antes de tentar novamente."
+        )
+    return f"Não foi possível converter {nome}: {detalhe}"
+
+
+# O corpo do documento começa no item 1 da numeração do SEI ("1. ASSUNTO"), nas duas
+# famílias de contadores
+RE_INICIO_DO_CORPO = re.compile(r'<p class="(?:Item_Nivel1|Paragrafo_Numerado_Nivel1)"')
+
+
+def separar_cabecalho(blocos: list[str]) -> tuple[list[str], list[str]]:
+    """Divide os blocos em cabeçalho (tudo antes do primeiro item 1) e corpo.
+
+    No SEI, título, número e dados do processo vêm do modelo do documento, e quem cola o
+    texto convertido costuma querer só o corpo. Sem item 1, não há como saber onde o
+    corpo começa: tudo é corpo, e nada é omitido.
+    """
+    for indice, bloco in enumerate(blocos):
+        if RE_INICIO_DO_CORPO.match(bloco.lstrip()):
+            return blocos[:indice], blocos[indice:]
+    return [], blocos
+
+
+def trechos_dos_blocos(blocos: list[str]) -> list[str]:
+    """Início do texto de cada bloco, para mostrar o que o cabeçalho contém.
+
+    Bloco sem texto (a linha em branco de &nbsp;) fica de fora: não há o que reconhecer.
+    """
+    trechos = []
+    for bloco in blocos:
+        texto = htmlmod.unescape(re.sub(r"<[^>]+>", " ", bloco)).replace("\xa0", " ")
+        if texto.strip():
+            trechos.append(trecho_inicial(texto))
+    return trechos
+
+
+def aplicar_cabecalho(blocos: list[str], omitir: bool) -> tuple[list[str], list[str]]:
+    """Devolve os blocos a converter e os trechos do cabeçalho encontrado.
+
+    O cabeçalho é sempre medido, para quem converte decidir se o omite; só sai dos
+    blocos quando `omitir` é verdadeiro. Compartilhada pelas duas conversões.
+    """
+    cabecalho, corpo = separar_cabecalho(blocos)
+    return (corpo if omitir else blocos), trechos_dos_blocos(cabecalho)
+
+
+def extrair_blocos_documento(
+    caminho: str | Path,
+    max_nivel: int = 4,
+    citacao: CitacaoPorRecuo | None = None,
+    avisos: list[str] | None = None,
+) -> list[str]:
+    """Identifica a extensão do arquivo e extrai a lista de blocos SEI."""
+    p = Path(caminho)
+    return extrair_blocos_de_fonte(p, p.suffix, max_nivel=max_nivel, citacao=citacao, avisos=avisos)
+
+
+def avisos_de_blocos_grandes(blocos: list[str], max_kb: int, so_corpo: bool, forcar_unico: bool) -> list[str]:
+    """Explica quando uma imagem sozinha impede a divisão automática."""
+    if forcar_unico:
+        return []
+    limite = orcamento_corpo(max_kb, so_corpo=so_corpo)
+    if any("<img " in bloco and len(bloco.encode("utf-8")) > limite for bloco in blocos):
+        return [
+            "Uma imagem incorporada ficou maior que o tamanho permitido por parte. "
+            "A divisão automática não consegue cortá-la. Reduza a imagem no documento original e converta de novo."
+        ]
+    return []
+
+
+def montar_saidas(
+    blocos: list[str],
+    nome_base: str,
+    sufixo: str = ".html",
+    so_corpo: bool = False,
+    forcar_unico: bool = False,
+    forcar_partes: bool = False,
+    max_kb: int = MAX_KB_PADRAO,
+) -> list[tuple[str, str]]:
+    """Divide os blocos em partes e devolve os pares (nome do arquivo, conteúdo).
+
+    É a parte da conversão que não toca no disco, compartilhada por quem grava arquivos
+    (a CLI) e por quem devolve texto (a interface web).
+    """
+    partes = [blocos] if forcar_unico else dividir_em_partes(blocos, orcamento_corpo(max_kb, so_corpo=so_corpo))
+
+    def renderizar(corpo: str, contadores: dict[str, int] | None = None) -> str:
+        return corpo + "\n" if so_corpo else montar_html(corpo, contadores=contadores)
+
+    if len(partes) <= 1 and not forcar_partes:
+        return [(f"{nome_base}{sufixo}", renderizar("\n".join(blocos)))]
+
+    saidas: list[tuple[str, str]] = []
+    # Cada parte começa a numeração de onde a anterior parou
+    contadores = contadores_zerados()
+    for i, parte in enumerate(partes, 1):
+        corpo_parte = "\n".join(parte)
+        saidas.append((f"{nome_base}_parte{i:02d}{sufixo}", renderizar(corpo_parte, contadores=contadores)))
+        contadores = avancar_contadores(contadores, corpo_parte)
+    return saidas
+
+
+def validar_saidas(
+    saidas: Iterable[tuple[str, str]], forcar_unico: bool = False, origem_markdown: bool = True
+) -> list[str]:
+    """Valida cada saída e devolve os avisos já identificados pelo nome do arquivo.
+
+    Compartilhada pelas duas conversões, para que a da web e a do disco não passem a
+    avisar coisas diferentes sobre o mesmo HTML. `origem_markdown` diz se a entrada era
+    .md: só aí ">", "```" e "~~" que sobraram no HTML indicam marcação não convertida.
+    """
+    avisos: list[str] = []
+    for idx, (nome, conteudo) in enumerate(saidas):
+        falhas = validar_html_sei(
+            conteudo,
+            validar_tamanho=not forcar_unico,
+            eh_continuidade=(idx > 0),
+            origem_markdown=origem_markdown,
+        )
+        avisos.extend(f"[{nome}] {f}" for f in falhas)
+    return avisos
+
+
+def converter_documento(
+    caminho_entrada: str | Path,
+    caminho_saida: str | Path | None = None,
+    outdir: str | Path | None = None,
+    so_corpo: bool = False,
+    forcar_unico: bool = False,
+    forcar_partes: bool = False,
+    max_kb: int = MAX_KB_PADRAO,
+    max_nivel: int = 4,
+    validar: bool = True,
+    citacao_por_recuo: bool = False,
+    omitir_cabecalho: bool = False,
+) -> ResultadoConversao:
+    """Converte um documento (DOCX, PDF, ODT, MD, TXT) em HTML(s) formatado(s) para o SEI.
+
+    Com `citacao_por_recuo`, o parágrafo recuado e em fonte menor que a do texto sai como
+    Citação. Desligado, ele segue texto comum e só é contado em `citacoes_por_recuo`.
+    Com `omitir_cabecalho`, o que vem antes do item 1 não entra na saída; desligado, só é
+    listado em `cabecalho_trechos`.
+    """
+    p_in = Path(caminho_entrada)
+    resultado = ResultadoConversao(arquivo_origem=p_in)
+
+    if not p_in.is_file():
+        resultado.sucesso = False
+        resultado.erros.append(f"Arquivo não encontrado: {p_in}")
+        return resultado
+
+    citacao = CitacaoPorRecuo(aplicar=citacao_por_recuo)
+    avisos_extracao: list[str] = []
+    try:
+        blocos = extrair_blocos_documento(p_in, max_nivel=max_nivel, citacao=citacao, avisos=avisos_extracao)
+    except Exception as e:
+        resultado.sucesso = False
+        resultado.erros.append(mensagem_erro_de_extracao(p_in.name, e))
+        return resultado
+    resultado.citacoes_por_recuo = citacao.encontradas
+    resultado.citacoes_trechos = citacao.trechos
+
+    if not blocos:
+        resultado.sucesso = False
+        resultado.erros.append(f"Nenhum conteúdo extraído de {p_in.name}.")
+        return resultado
+    blocos, resultado.cabecalho_trechos = aplicar_cabecalho(blocos, omitir_cabecalho)
+    resultado.avisos = avisos_extracao + avisos_de_blocos_grandes(blocos, max_kb, so_corpo, forcar_unico)
+
+    if caminho_saida is not None:
+        saida_base = Path(caminho_saida)
+    else:
+        saida_base = derivar_caminho_saida(p_in, so_corpo=so_corpo, outdir=outdir)
+
+    saida_base.parent.mkdir(parents=True, exist_ok=True)
+
+    saidas = montar_saidas(
+        blocos,
+        nome_base=saida_base.stem,
+        sufixo=saida_base.suffix,
+        so_corpo=so_corpo,
+        forcar_unico=forcar_unico,
+        forcar_partes=forcar_partes,
+        max_kb=max_kb,
+    )
+    # Uma parte só ainda é saída em partes quando --partes força o sufixo _parte01:
+    # o arquivo único anterior precisa sair, para os dois não conviverem na pasta
+    limpar_saidas_antigas(saida_base, gerar_partes=len(saidas) > 1 or forcar_partes)
+
+    gerados: list[Path] = []
+    for nome, conteudo in saidas:
+        caminho = saida_base.parent / nome
+        caminho.write_text(conteudo, encoding="utf-8")
+        gerados.append(caminho)
+
+    resultado.arquivos_gerados = gerados
+
+    if validar:
+        # Valida o que acabou de ser montado, em vez de reler do disco o que já está aqui
+        resultado.avisos.extend(validar_saidas(
+            saidas, forcar_unico=forcar_unico, origem_markdown=p_in.suffix.lower() == ".md"
+        ))
+
+    return resultado
+
+
+def converter_bytes(
+    nome_arquivo: str,
+    conteudo: bytes,
+    so_corpo: bool = False,
+    forcar_unico: bool = False,
+    forcar_partes: bool = False,
+    max_kb: int = MAX_KB_PADRAO,
+    max_nivel: int = 4,
+    validar: bool = True,
+    citacao_por_recuo: bool = False,
+    omitir_cabecalho: bool = False,
+) -> ResultadoMemoria:
+    """Converte o conteúdo de um documento sem tocar no disco.
+
+    É o caminho usado pela interface web: o navegador entrega os bytes do arquivo, e a
+    conversão inteira acontece em memória. Gravar entrada e saída em arquivos
+    temporários só para relê-los custa caro no sistema de arquivos emulado do
+    WebAssembly, onde a página roda.
+    """
+    origem = Path(nome_arquivo)
+    resultado = ResultadoMemoria(nome_origem=origem.name)
+    citacao = CitacaoPorRecuo(aplicar=citacao_por_recuo)
+    avisos_extracao: list[str] = []
+
+    try:
+        # O stream leva o nome junto para que os leitores citem o arquivo que o usuário
+        # enviou, e não um nome genérico, nas mensagens de erro. Fecha assim que os
+        # blocos saem, para devolver a memória do navegador sem esperar o coletor
+        with closing(StreamNomeado(conteudo, origem.name)) as fonte:
+            blocos = extrair_blocos_de_fonte(
+                fonte, origem.suffix, max_nivel=max_nivel, citacao=citacao, avisos=avisos_extracao
+            )
+    except Exception as e:
+        resultado.sucesso = False
+        resultado.erros.append(mensagem_erro_de_extracao(origem.name, e))
+        return resultado
+    resultado.citacoes_por_recuo = citacao.encontradas
+    resultado.citacoes_trechos = citacao.trechos
+
+    if not blocos:
+        resultado.sucesso = False
+        resultado.erros.append(f"Nenhum conteúdo extraído de {origem.name}.")
+        return resultado
+    blocos, resultado.cabecalho_trechos = aplicar_cabecalho(blocos, omitir_cabecalho)
+    resultado.avisos = avisos_extracao + avisos_de_blocos_grandes(blocos, max_kb, so_corpo, forcar_unico)
+
+    # A convenção de nomes é a mesma da conversão em disco (Nota_Tecnica_ vira
+    # Nota_Tecnica_SEI_), para que os arquivos baixados pela web não destoem da CLI
+    saida = derivar_caminho_saida(origem, so_corpo=so_corpo)
+
+    saidas = montar_saidas(
+        blocos,
+        nome_base=saida.stem,
+        sufixo=saida.suffix,
+        so_corpo=so_corpo,
+        forcar_unico=forcar_unico,
+        forcar_partes=forcar_partes,
+        max_kb=max_kb,
+    )
+    resultado.arquivos = [ArquivoSEI(nome=nome, conteudo=texto) for nome, texto in saidas]
+
+    if validar:
+        resultado.avisos.extend(validar_saidas(
+            saidas, forcar_unico=forcar_unico, origem_markdown=origem.suffix.lower() == ".md"
+        ))
+
+    return resultado
+
+
+def entra_na_varredura(arquivo: Path) -> bool:
+    """Diz se um arquivo achado numa pasta deve ser convertido.
+
+    Compartilhada pela conversão de pastas e pelo modo watch, para os dois pularem os mesmos
+    arquivos. A trava do Word (~$) e os ocultos têm extensão válida, mas não são documentos:
+    convertê-los só produziria falha.
+    """
+    return arquivo.suffix.lower() in EXTENSOES_RECONHECIDAS and not arquivo.name.startswith(("~$", "."))
+
+
+def converter_diretorio(
+    diretorio: str | Path,
+    outdir: str | Path | None = None,
+    recursivo: bool = False,
+    so_corpo: bool = False,
+    forcar_unico: bool = False,
+    forcar_partes: bool = False,
+    max_kb: int = MAX_KB_PADRAO,
+    max_nivel: int = 4,
+    validar: bool = True,
+    citacao_por_recuo: bool = False,
+    omitir_cabecalho: bool = False,
+) -> list[ResultadoConversao]:
+    """Varre um diretório e converte todos os documentos compatíveis encontrados."""
+    p_dir = Path(diretorio)
+    if not p_dir.is_dir():
+        raise NotADirectoryError(f"Caminho não é um diretório: {diretorio}")
+
+    padrao = "**/*" if recursivo else "*"
+    arquivos = sorted(f for f in p_dir.glob(padrao) if f.is_file() and entra_na_varredura(f))
+
+    resultados = []
+    for arq in arquivos:
+        destino_pasta = None
+        if outdir is not None:
+            relativo = arq.parent.relative_to(p_dir)
+            destino_pasta = Path(outdir) / relativo
+
+        res = converter_documento(
+            caminho_entrada=arq,
+            outdir=destino_pasta,
+            so_corpo=so_corpo,
+            forcar_unico=forcar_unico,
+            forcar_partes=forcar_partes,
+            max_kb=max_kb,
+            max_nivel=max_nivel,
+            validar=validar,
+            citacao_por_recuo=citacao_por_recuo,
+            omitir_cabecalho=omitir_cabecalho,
+        )
+        resultados.append(res)
+
+    return resultados

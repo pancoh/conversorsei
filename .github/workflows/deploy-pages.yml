@@ -1,0 +1,125 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSAO: "0.12.19"
+  # Vale para o uv sync e para cada uv run: sem ele, o uv run podia recriar o ambiente com
+  # outro Python do sistema
+  UV_PYTHON: "3.11"
+
+jobs:
+  verificar:
+    name: Testes e lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      # As versões vêm do uv.lock, as mesmas do ambiente local e dos wheels da página
+      # (python-docx e pypdf em docs/vendor/). Com pip e ">=", uma versão nova do ruff ou do
+      # mypy reprovava o CI sem mudança no código, e os testes rodavam com bibliotecas mais
+      # novas que as da página publicada
+      - name: Instalar dependências (uv.lock)
+        run: |
+          python -m pip install "uv==${{ env.UV_VERSAO }}"
+          uv sync --frozen
+
+      - name: Ruff
+        run: uv run --frozen ruff check .
+
+      - name: Mypy
+        run: uv run --frozen mypy
+
+      - name: Pytest
+        run: uv run --frozen pytest -q
+
+      - name: Bundle web sincronizado com o codigo-fonte
+        run: uv run --frozen python scripts/bundle_web.py --verificar
+
+      - name: CSS do Tailwind cobre as classes da interface
+        run: uv run --frozen python scripts/verificar_css.py
+
+  navegador:
+    name: Teste no navegador
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      # WebKit é o motor do Safari: é nele que o pyodide.asm.js escapava do cache
+      - name: Instalar dependências (uv.lock), o Chromium e o WebKit
+        run: |
+          python -m pip install "uv==${{ env.UV_VERSAO }}"
+          uv sync --frozen --group e2e
+          uv run --frozen playwright install --with-deps chromium webkit
+
+      # Abre a página num perfil limpo, converte, omite o cabeçalho, copia e converte de
+      # novo sem rede (tests/test_navegador.py). Precisa de rede para o CDN do Pyodide
+      - name: Conversão, cópia e uso sem rede
+        run: uv run --frozen pytest -m e2e
+
+  deploy:
+    name: Publicar no GitHub Pages
+    needs: [verificar, navegador]
+    if: github.event_name != 'pull_request'
+    # A fila do Pages fica só na publicação: se ficasse no nível do workflow, as
+    # execuções de pull_request disputariam o mesmo grupo e seriam canceladas.
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Build Web Bundle
+        run: |
+          python scripts/bundle_web.py
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: "docs"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="titulo">
+  <title id="titulo">Marca do Conversor SEI</title>
+  <rect width="64" height="64" rx="13" fill="#123B53"/>
+  <path d="M15 10h24l9 9v30a5 5 0 0 1-5 5H20a5 5 0 0 1-5-5V15a5 5 0 0 1 5-5Z" fill="#fff"/>
+  <path d="M39 10v8a2 2 0 0 0 2 2h7" fill="#DAEAF0"/>
+  <path d="M22 26h17M22 33h12" fill="none" stroke="#0694DD" stroke-linecap="round" stroke-width="3.5"/>
+  <path d="M22 41h21m-7-7 7 7-7 7" fill="none" stroke="#91BB25" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+</svg>

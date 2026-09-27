@@ -1,0 +1,313 @@
+import json
+
+from conversao_sei.cli import main
+from conversao_sei.core import converter_diretorio, converter_documento
+
+
+def test_core_converter_documento_md(tmp_path):
+    md_file = tmp_path / "minuta.md"
+    md_file.write_text("# 1. ASSUNTO\n\n1.1. Texto do assunto.", encoding="utf-8")
+
+    res = converter_documento(md_file, outdir=tmp_path / "saida")
+    assert res.sucesso
+    assert len(res.arquivos_gerados) == 1
+    assert (tmp_path / "saida" / "minuta_SEI.html").is_file()
+
+
+def test_core_converter_diretorio(tmp_path):
+    pasta_entrada = tmp_path / "entrada"
+    pasta_saida = tmp_path / "saida"
+    pasta_entrada.mkdir()
+
+    (pasta_entrada / "doc1.md").write_text("# 1. ASSUNTO\n\n1.1. Texto 1", encoding="utf-8")
+    (pasta_entrada / "doc2.txt").write_text("1. ASSUNTO\n\n1.1. Texto 2", encoding="utf-8")
+
+    resultados = converter_diretorio(pasta_entrada, outdir=pasta_saida)
+    assert len(resultados) == 2
+    assert all(r.sucesso for r in resultados)
+    assert (pasta_saida / "doc1_SEI.html").is_file()
+    assert (pasta_saida / "doc2_SEI.html").is_file()
+
+
+def test_core_converter_diretorio_com_subpastas(tmp_path):
+    pasta_entrada = tmp_path / "dados" / "entrada"
+    pasta_saida = tmp_path / "dados" / "saida"
+    sub_processo = pasta_entrada / "80000.001234_2026-10"
+    sub_processo.mkdir(parents=True)
+
+    (sub_processo / "nota.md").write_text("# 1. ASSUNTO\n\n1.1. Texto", encoding="utf-8")
+    (pasta_entrada / "avulso.md").write_text("# 1. ASSUNTO\n\n1.1. Avulso", encoding="utf-8")
+
+    resultados = converter_diretorio(pasta_entrada, outdir=pasta_saida, recursivo=True)
+    assert len(resultados) == 2
+    assert (pasta_saida / "80000.001234_2026-10" / "nota_SEI.html").is_file()
+    assert (pasta_saida / "avulso_SEI.html").is_file()
+
+
+def test_cli_conversao_json(tmp_path, capsys):
+    md_file = tmp_path / "teste.md"
+    md_file.write_text("# 1. ASSUNTO\n\n1.1. Parágrafo único.", encoding="utf-8")
+
+    exit_code = main([str(md_file), "-o", str(tmp_path / "saida_cli"), "--json"])
+    assert exit_code == 0
+
+    captured = capsys.readouterr()
+    dados = json.loads(captured.out)
+    assert len(dados) == 1
+    assert dados[0]["sucesso"] is True
+    assert len(dados[0]["gerados"]) == 1
+
+
+
+def test_cli_corpo_gera_fragmento_sem_head(tmp_path):
+    """--corpo entrega só o fragmento, pronto para o plugin 'inserir HTML' do SEI Pro."""
+    entrada = tmp_path / "minuta.md"
+    entrada.write_text("# 1. ASSUNTO\n\n1.1. Texto do corpo.", encoding="utf-8")
+
+    assert main([str(entrada), "-o", str(tmp_path), "--corpo"]) == 0
+
+    gerado = tmp_path / "minuta_SEI_corpo.html"
+    conteudo = gerado.read_text(encoding="utf-8")
+    assert "<!DOCTYPE html>" not in conteudo
+    assert "<style>" not in conteudo
+    assert 'class="Item_Nivel1"' in conteudo
+
+
+def test_cli_partes_forca_nomenclatura(tmp_path):
+    """--partes mantém o sufixo _parte01 mesmo quando o documento caberia num arquivo só."""
+    entrada = tmp_path / "curta.md"
+    entrada.write_text("# 1. ASSUNTO\n\n1.1. Documento curto.", encoding="utf-8")
+
+    assert main([str(entrada), "-o", str(tmp_path), "--partes"]) == 0
+    assert (tmp_path / "curta_SEI_parte01.html").is_file()
+    assert not (tmp_path / "curta_SEI.html").is_file()
+
+
+def test_cli_unico_desativa_divisao(tmp_path):
+    """--unico gera um arquivo só, ainda que ultrapasse o alvo de tamanho."""
+    linhas = []
+    for i in range(1, 40):
+        linhas.append(f"# {i}. SECAO {i}")
+        linhas.append("Texto de preenchimento. " * 40)
+    entrada = tmp_path / "grande.md"
+    entrada.write_text("\n\n".join(linhas), encoding="utf-8")
+
+    assert main([str(entrada), "-o", str(tmp_path), "--unico"]) == 0
+    assert (tmp_path / "grande_SEI.html").is_file()
+    assert not list(tmp_path.glob("grande_SEI_parte*.html"))
+
+
+def test_cli_troca_entre_unico_e_partes_limpa_saida_antiga(tmp_path):
+    """Arquivo único e partes são mutuamente exclusivos: a saída anterior é removida."""
+    entrada = tmp_path / "doc.md"
+    entrada.write_text("# 1. ASSUNTO\n\n1.1. Texto.", encoding="utf-8")
+
+    main([str(entrada), "-o", str(tmp_path), "--partes"])
+    assert (tmp_path / "doc_SEI_parte01.html").is_file()
+
+    main([str(entrada), "-o", str(tmp_path)])
+    assert (tmp_path / "doc_SEI.html").is_file()
+    assert not list(tmp_path.glob("doc_SEI_parte*.html"))
+
+
+def test_core_converte_readme_quando_solicitado(tmp_path):
+    """README.md deixou de ser descartado em silêncio pela varredura de diretório."""
+    pasta = tmp_path / "entrada"
+    pasta.mkdir()
+    (pasta / "README.md").write_text("# 1. ASSUNTO\n\n1.1. Conteudo do readme.", encoding="utf-8")
+
+    resultados = converter_diretorio(pasta, outdir=tmp_path / "saida")
+    assert len(resultados) == 1
+    assert (tmp_path / "saida" / "README_SEI.html").is_file()
+
+
+def test_exemplo_do_repositorio_converte_sem_avisos(tmp_path):
+    """O documento de exemplo precisa continuar convertendo limpo (é o que o README indica)."""
+    from pathlib import Path
+
+    exemplo = Path(__file__).resolve().parent.parent / "exemplos" / "nota_tecnica_exemplo.md"
+    resultado = converter_documento(exemplo, outdir=tmp_path)
+
+    assert resultado.sucesso, resultado.erros
+    assert resultado.avisos == []
+
+    html = resultado.arquivos_gerados[0].read_text(encoding="utf-8")
+    assert 'class="Item_Nivel1"' in html
+    assert "<table" in html
+    assert '<li class="Texto_Justificado">' in html
+
+
+def test_watch_so_converte_arquivo_estabilizado(tmp_path):
+    """A gravação do Word acontece em etapas, e o arquivo só é lido quando para de mudar."""
+    from conversao_sei.cli import ciclo_de_observacao
+
+    entrada = tmp_path / "entrada"
+    entrada.mkdir()
+    doc = entrada / "minuta.md"
+    doc.write_text("# 1. ASSUNTO\n\n1.1. Primeira versão.", encoding="utf-8")
+
+    convertidos: dict = {}
+    pendentes: dict = {}
+
+    # Primeira varredura só registra: o arquivo pode estar em meio à gravação
+    assert ciclo_de_observacao([str(entrada)], False, convertidos, pendentes) == []
+    # Na segunda, o arquivo continua igual e está pronto
+    assert ciclo_de_observacao([str(entrada)], False, convertidos, pendentes) == [doc]
+    # Sem alteração, não converte de novo
+    assert ciclo_de_observacao([str(entrada)], False, convertidos, pendentes) == []
+
+
+def test_watch_reconverte_apos_alteracao_e_esquece_removido(tmp_path):
+    from conversao_sei.cli import ciclo_de_observacao
+
+    entrada = tmp_path / "entrada"
+    entrada.mkdir()
+    doc = entrada / "minuta.md"
+    doc.write_text("# 1. ASSUNTO", encoding="utf-8")
+
+    convertidos: dict = {}
+    pendentes: dict = {}
+    ciclo_de_observacao([str(entrada)], False, convertidos, pendentes)
+    ciclo_de_observacao([str(entrada)], False, convertidos, pendentes)
+
+    doc.write_text("# 1. ASSUNTO\n\n1.1. Texto acrescentado depois.", encoding="utf-8")
+    assert ciclo_de_observacao([str(entrada)], False, convertidos, pendentes) == []
+    assert ciclo_de_observacao([str(entrada)], False, convertidos, pendentes) == [doc]
+
+    doc.unlink()
+    assert ciclo_de_observacao([str(entrada)], False, convertidos, pendentes) == []
+    assert convertidos == {} and pendentes == {}
+
+
+def test_watch_ignora_formato_nao_suportado_e_saida_gerada(tmp_path):
+    """O HTML gerado não pode realimentar a observação quando a saída fica dentro da entrada."""
+    from conversao_sei.cli import arquivos_observaveis
+
+    entrada = tmp_path / "entrada"
+    entrada.mkdir()
+    (entrada / "minuta.md").write_text("# 1. ASSUNTO", encoding="utf-8")
+    (entrada / "minuta_SEI.html").write_text("<p>gerado</p>", encoding="utf-8")
+    (entrada / "planilha.xlsx").write_bytes(b"nao suportado")
+
+    observados = arquivos_observaveis([str(entrada)], recursivo=False)
+    assert [p.name for p in observados] == ["minuta.md"]
+
+
+def test_watch_recusa_saida_com_nome_fixo(tmp_path, capsys):
+    entrada = tmp_path / "entrada"
+    entrada.mkdir()
+    (entrada / "minuta.md").write_text("# 1. ASSUNTO", encoding="utf-8")
+
+    codigo = main([str(entrada), "--watch", "--saida", str(tmp_path / "fixo.html")])
+    assert codigo == 1
+    assert "não combina com --watch" in capsys.readouterr().err
+
+
+def test_watch_converte_e_encerra_no_ctrl_c(tmp_path, monkeypatch, capsys):
+    """O laço converte o que apareceu e sai limpo no Ctrl+C, sem estourar exceção."""
+    import conversao_sei.cli as cli
+
+    entrada = tmp_path / "entrada"
+    entrada.mkdir()
+    (entrada / "minuta.md").write_text("# 1. ASSUNTO\n\n1.1. Texto.", encoding="utf-8")
+
+    saida = tmp_path / "saida"
+    chamadas = {"n": 0}
+
+    def falso_sleep(_segundos):
+        chamadas["n"] += 1
+        # Deixa duas varreduras acontecerem (registro e conversão) antes de encerrar
+        if chamadas["n"] >= 2:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli.time, "sleep", falso_sleep)
+
+    codigo = main([str(entrada), "--watch", "-o", str(saida)])
+    assert codigo == 0
+
+    out = capsys.readouterr().out
+    assert "Observando" in out
+    assert "minuta.md ->" in out
+    assert "Observação encerrada." in out
+    assert (saida / "minuta_SEI.html").is_file()
+
+
+def test_cli_troca_de_unico_para_partes_limpa_saida_antiga(tmp_path):
+    """O sentido inverso: --partes num documento curto remove o arquivo único anterior."""
+    entrada = tmp_path / "doc.md"
+    entrada.write_text("# 1. ASSUNTO\n\n1.1. Texto.", encoding="utf-8")
+
+    main([str(entrada), "-o", str(tmp_path)])
+    assert (tmp_path / "doc_SEI.html").is_file()
+
+    main([str(entrada), "-o", str(tmp_path), "--partes"])
+    assert (tmp_path / "doc_SEI_parte01.html").is_file()
+    assert not (tmp_path / "doc_SEI.html").exists()
+
+
+def test_rtf_em_pasta_vira_falha_com_orientacao_e_nao_some(tmp_path, capsys):
+    """Antes aceito, o .rtf deixado na pasta de entrada vira falha explicada, e não some.
+
+    Vale para a pasta, para a API (converter_diretorio), para o watch e para o --json, que
+    sai com código 1. Arquivo de trava do Word (~$) continua ignorado.
+    """
+    import json
+
+    from conversao_sei.cli import arquivos_observaveis, main
+
+    entrada = tmp_path / "entrada"
+    entrada.mkdir()
+    (entrada / "contrato.rtf").write_bytes(b"{\\rtf1 texto}")
+    (entrada / "~$contrato.rtf").write_bytes(b"{\\rtf1 texto}")
+    (entrada / "nota.md").write_text("Texto.", encoding="utf-8")
+
+    resultados = {r.arquivo_origem.name: r for r in converter_diretorio(entrada, outdir=tmp_path / "api")}
+    assert set(resultados) == {"contrato.rtf", "nota.md"}
+    assert not resultados["contrato.rtf"].sucesso
+    assert "não é mais aceito" in resultados["contrato.rtf"].erros[0]
+    assert ".docx ou .odt" in resultados["contrato.rtf"].erros[0]
+
+    assert main([str(entrada), "-o", str(tmp_path / "saida")]) == 1
+    saida = capsys.readouterr()
+    assert "não é mais aceito" in saida.out + saida.err
+    assert (tmp_path / "saida" / "nota_SEI.html").exists()
+
+    assert main([str(entrada / "contrato.rtf"), "--json", "-o", str(tmp_path / "saida")]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload[0]["sucesso"] is False
+
+    # O watch enxerga o .rtf que chegar depois, inclusive passado direto como alvo
+    observados = {p.name for p in arquivos_observaveis([str(entrada)], recursivo=False)}
+    assert observados == {"contrato.rtf", "nota.md"}
+    assert arquivos_observaveis([str(entrada / "contrato.rtf")], recursivo=False)
+
+
+def test_doc_em_pasta_vira_falha_com_orientacao_e_nao_some(tmp_path):
+    """O .doc deixado na pasta de entrada recebe a orientação, como o .rtf."""
+    from conversao_sei.cli import arquivos_observaveis
+
+    entrada = tmp_path / "entrada"
+    entrada.mkdir()
+    (entrada / "oficio.doc").write_bytes(b"\xd0\xcf\x11\xe0")
+
+    resultados = converter_diretorio(entrada, outdir=tmp_path / "saida")
+    assert [r.arquivo_origem.name for r in resultados] == ["oficio.doc"]
+    assert not resultados[0].sucesso
+    assert "salve como .docx ou .odt" in resultados[0].erros[0]
+    assert {p.name for p in arquivos_observaveis([str(entrada)], recursivo=False)} == {"oficio.doc"}
+
+
+def test_cli_sem_cabecalho_omite_e_informa(tmp_path, capsys):
+    entrada = tmp_path / "nota.md"
+    entrada.write_text("# NOTA TÉCNICA Nº 1\n\n## 1. ASSUNTO\n\nTexto.\n", encoding="utf-8")
+    saida = tmp_path / "saida"
+
+    assert main([str(entrada), "--sem-cabecalho", "-o", str(saida)]) == 0
+    assert "1 parágrafo antes do item 1 foi omitido" in capsys.readouterr().out
+    html = (saida / "nota_SEI.html").read_text(encoding="utf-8")
+    assert "NOTA TÉCNICA" not in html
+    assert 'class="Item_Nivel1"' in html
+
+    assert main([str(entrada), "-o", str(saida)]) == 0
+    assert "cabeçalho:" not in capsys.readouterr().out
+    assert "NOTA TÉCNICA" in (saida / "nota_SEI.html").read_text(encoding="utf-8")
