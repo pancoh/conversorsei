@@ -14,9 +14,9 @@
 <p align="center">
   <a href="https://ramson.com.br/conversorsei/"><strong>Abrir o conversor</strong></a>
   &nbsp;·&nbsp;
-  <a href="#como-usar">Como usar</a>
+  <a href="#uso">Como usar</a>
   &nbsp;·&nbsp;
-  <a href="#perguntas-frequentes">Perguntas frequentes</a>
+  <a href="#duvidas">Perguntas frequentes</a>
 </p>
 
 <p align="center">
@@ -31,7 +31,7 @@
 
 ---
 
-## Para que serve
+## <img src=".github/readme/para-que-serve.svg" width="24" height="24" alt=""> Para que serve
 
 Quem cola um texto do Word no SEI costuma perder a formatação: a numeração se desfaz, as
 tabelas ficam tortas e os parágrafos saem fora do padrão. Depois, é preciso ajustar tudo à mão.
@@ -48,7 +48,7 @@ do SEI e você cola o resultado pronto no editor.
 > **Não precisa instalar nada.** Basta abrir
 > [ramson.com.br/conversorsei](https://ramson.com.br/conversorsei/) no navegador.
 
-## Por que usar
+## <img src=".github/readme/por-que-usar.svg" width="24" height="24" alt=""> Por que usar
 
 | Vantagem | Como funciona |
 |---|---|
@@ -59,7 +59,7 @@ do SEI e você cola o resultado pronto no editor.
 | **Documentos grandes** | Quando o texto passa do limite do SEI, o conversor divide em partes para você colar uma de cada vez. |
 | **Gratuito** | Sem cadastro, sem anúncios e sem limite de uso. |
 
-## Formatos aceitos
+## <img src=".github/readme/formatos.svg" width="24" height="24" alt=""> Formatos aceitos
 
 | Formato | Origem comum |
 |---|---|
@@ -71,7 +71,9 @@ do SEI e você cola o resultado pronto no editor.
 PDF digitalizado (uma foto da página) não tem texto para ler. Nesse caso, passe o arquivo antes
 por um programa de OCR.
 
-## Como usar
+<a id="uso"></a>
+
+## <img src=".github/readme/como-usar.svg" width="24" height="24" alt=""> Como usar
 
 1. Abra [ramson.com.br/conversorsei](https://ramson.com.br/conversorsei/).
 2. Arraste o documento para a página ou clique para escolher o arquivo.
@@ -81,7 +83,9 @@ por um programa de OCR.
 
 Se o documento foi dividido em partes, copie e cole uma parte de cada vez, na ordem indicada.
 
-## Perguntas frequentes
+<a id="duvidas"></a>
+
+## <img src=".github/readme/perguntas.svg" width="24" height="24" alt=""> Perguntas frequentes
 
 **O conversor guarda ou lê meu documento?**
 Não. O arquivo é processado no seu navegador e não é enviado a nenhum servidor.
@@ -104,7 +108,7 @@ navegador. O nome e o conteúdo do documento não vão no e-mail.
 
 ---
 
-## Linha de comando
+## <img src=".github/readme/linha-de-comando.svg" width="24" height="24" alt=""> Linha de comando
 
 Para converter muitos arquivos de uma vez, o conversor também roda no terminal. Requer Python
 3.11 ou mais recente.
@@ -157,16 +161,16 @@ O GitHub Actions roda todas as verificações e só publica a página se elas pa
 
 </details>
 
-## Privacidade
+## <img src=".github/readme/privacidade.svg" width="24" height="24" alt=""> Privacidade
 
 A página conta visitas e conversões pelo GoatCounter, sem cookies. De cada conversão vão só a
 extensão do arquivo e o resultado, nunca o nome ou o conteúdo do documento.
 
-## Apoie o projeto
+## <img src=".github/readme/apoio.svg" width="24" height="24" alt=""> Apoie o projeto
 
 O Conversor SEI é gratuito. Se ele ajuda no seu trabalho, você pode apoiar pelo link
 **Apoie este projeto**, no rodapé da página (Pix).
 
-## Licença
+## <img src=".github/readme/licenca.svg" width="24" height="24" alt=""> Licença
 
 MIT. Veja [LICENSE](LICENSE).
