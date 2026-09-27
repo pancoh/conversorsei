@@ -93,12 +93,11 @@
           <p id="status-title" class="text-sm font-semibold text-blue-900">Preparando o conversor...</p>
           <p id="status-desc" class="text-sm text-blue-700">Na primeira visita, o carregamento leva alguns segundos.</p>
           <!-- Só aparecem em erro de carregamento ou de conversão (ver mostrarStatusErro). O
-               reconhecimento e as opções de OCR, só no PDF sem camada de texto -->
+               reconhecimento de texto, só no PDF sem camada de texto -->
           <button id="status-ocr-iniciar" type="button" class="hidden mt-2 mb-1 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-sm font-semibold transition-colors">
             <i data-lucide="scan-text" class="w-4 h-4 text-slate-500"></i>Reconhecer texto (OCR)
           </button>
           <div class="flex flex-wrap gap-x-3 gap-y-1">
-            <a id="status-ocr" href="#ocr-ajuda" class="hidden text-sm font-semibold text-rose-700 hover:underline">Como converter PDF digitalizado</a>
             <a id="status-relato" href="#" data-relato class="hidden text-sm font-semibold text-rose-700 hover:underline">Relatar este problema</a>
           </div>
         </div>
@@ -139,19 +138,7 @@
       </div>
       </label>
 
-      <div id="drop-ajuda" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-500">
-        <!-- Os programas externos saíram da lista: o OCRmyPDF usa o mesmo motor (Tesseract) e,
-             comparado no mesmo documento, deu o mesmo resultado que o OCR da página -->
-        <details id="ocr-ajuda">
-          <summary class="cursor-pointer text-slate-600 hover:text-blue-700">PDF digitalizado? Veja como converter.</summary>
-          <div class="mt-2 bg-white border border-slate-200 rounded-lg p-3 space-y-2 text-slate-600">
-            <p>Envie o PDF e, no aviso de erro, clique em <strong>Reconhecer texto (OCR)</strong>. O reconhecimento roda no navegador, e o documento não sai do computador.</p>
-            <p><strong>O texto reconhecido pode conter erros</strong>, principalmente em nomes, números e acentos. Confira com o original antes de salvar no SEI.</p>
-            <p>Se houver muitos erros, peça o documento original em Word (.docx) ou use um programa de OCR com outro motor, como o Adobe Acrobat ou o ABBYY FineReader.</p>
-          </div>
-        </details>
-        <p class="sm:text-right">A conversão nesta página ocorre no navegador. O conversor não envia o documento a servidores.</p>
-      </div>
+      <p id="drop-ajuda" class="text-xs text-slate-500 text-center">A conversão nesta página ocorre no navegador. O conversor não envia o documento a servidores.</p>
     </div>
 
     <!-- Painel de Opções Avançadas -->
@@ -424,7 +411,7 @@
   </footer>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=7738fdd8f3"></script>
+  <script src="app.js?v=75ceb2418d"></script>
 
   <!-- Contagem de acessos, sem cookies. Fica fora do service worker: sem rede, a visita
        apenas não é contada, e a página continua abrindo -->

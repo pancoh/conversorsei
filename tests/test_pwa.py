@@ -146,9 +146,9 @@ def test_ativacao_apaga_so_os_proprios_caches():
     assert "`conversao-sei-estatico-${VERSAO}`" in sw and "`conversao-sei-execucao-${VERSAO}`" in sw
 
 
-def test_mensagem_do_pdf_sem_texto_aciona_as_opcoes_de_ocr():
-    """A página mostra o link das opções de OCR quando a mensagem de erro traz a marca do
-    PDF sem camada de texto. Se a frase do pdf_converter mudar, o link some sem aviso."""
+def test_mensagem_do_pdf_sem_texto_oferece_o_ocr():
+    """A página mostra o botão do OCR quando a mensagem de erro traz a marca do PDF sem
+    camada de texto. Se a frase do pdf_converter mudar, o botão some sem aviso."""
     app = APP.read_text(encoding="utf-8")
     m = re.search(r"const MARCA_PDF_SEM_TEXTO = '([^']+)'", app)
     assert m, "MARCA_PDF_SEM_TEXTO não encontrada em app.js"

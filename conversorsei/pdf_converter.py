@@ -49,8 +49,8 @@ def extrair_texto_pdf(pdf_path: FonteDocumento) -> str:
         # Sem camada de texto não há o que converter, e o erro genérico ("nenhum
         # conteúdo extraído") parece defeito da ferramenta
         raise RuntimeError(
-            f"O PDF {nome} não tem camada de texto: provavelmente é um documento digitalizado. "
-            "Passe o arquivo por OCR antes de converter."
+            f"O PDF {nome} não tem camada de texto: provavelmente é um documento digitalizado "
+            "e precisa de OCR."
         )
     return texto
 

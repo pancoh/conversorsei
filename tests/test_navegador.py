@@ -247,21 +247,15 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     relato = unquote(pagina.evaluate("() => linkDoRelato()"))
     assert "Formato: .docx" in relato and "Situação: Erro ao converter documento" in relato
     assert "Sigiloso" not in relato and "Parecer" not in relato and "<arquivo>" in relato
-    assert pagina.locator("#status-ocr").is_hidden()
+    assert pagina.locator("#status-ocr-iniciar").is_hidden()
 
-    # PDF sem camada de texto: o erro leva às opções de OCR, que estavam escondidas com a
-    # área de envio encolhida depois da primeira conversão
-    assert pagina.locator("#drop-ajuda").is_hidden()
+    # PDF sem camada de texto: o erro oferece o OCR, e a conversão seguinte o esconde
     pagina.set_input_files(
         "#file-input", files=[{"name": "digitalizado.pdf", "mimeType": "application/pdf", "buffer": _pdf_sem_texto()}]
     )
-    pagina.locator("#status-ocr").wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
-    pagina.click("#status-ocr")
-    pagina.locator("#ocr-ajuda").wait_for(state="visible")
-    assert pagina.locator("#ocr-ajuda").evaluate("el => el.open")
-    pagina.locator("#ocr-ajuda", has_text="pode conter erros").wait_for(state="visible")
+    pagina.locator("#status-ocr-iniciar").wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
     _enviar(pagina)
-    pagina.locator("#status-ocr").wait_for(state="hidden", timeout=PRAZO_CONVERSAO_MS)
+    pagina.locator("#status-ocr-iniciar").wait_for(state="hidden", timeout=PRAZO_CONVERSAO_MS)
     pagina.locator("#status-relato").wait_for(state="hidden", timeout=PRAZO_CONVERSAO_MS)
 
     # O service worker precisa ter guardado o Pyodide, e não só o cache HTTP do navegador,

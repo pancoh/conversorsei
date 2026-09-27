@@ -28,7 +28,6 @@ const statusSpinner = document.getElementById('status-spinner');
 const statusTitle = document.getElementById('status-title');
 const statusDesc = document.getElementById('status-desc');
 const statusRelato = document.getElementById('status-relato');
-const statusOcr = document.getElementById('status-ocr');
 const statusOcrIniciar = document.getElementById('status-ocr-iniciar');
 
 const dropZone = document.getElementById('drop-zone');
@@ -676,7 +675,6 @@ function reativarResultado() {
 // Estados do cartão de status
 function mostrarStatusProcessando(titulo) {
   statusRelato.classList.add('hidden');
-  statusOcr.classList.add('hidden');
   statusOcrIniciar.classList.add('hidden');
   pyodideStatusCard.className = 'bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
   statusSpinner.className = 'animate-spin text-blue-600';
@@ -693,7 +691,6 @@ function mostrarStatusProcessando(titulo) {
 // na descrição ao mesmo tempo
 function mostrarStatusDiscreto(texto) {
   statusRelato.classList.add('hidden');
-  statusOcr.classList.add('hidden');
   statusOcrIniciar.classList.add('hidden');
   pyodideStatusCard.className = 'flex items-center px-1';
   statusSpinner.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-emerald-700"></i>';
@@ -705,14 +702,13 @@ function mostrarStatusDiscreto(texto) {
 }
 
 // Trecho da mensagem do pdf_converter para o PDF sem camada de texto. O teste
-// test_mensagem_do_pdf_sem_texto_aciona_as_opcoes_de_ocr confere que os dois batem
+// test_mensagem_do_pdf_sem_texto_oferece_o_ocr confere que os dois batem
 const MARCA_PDF_SEM_TEXTO = 'não tem camada de texto';
 
 function mostrarStatusErro(titulo, descricao) {
   registrarParaRelato(titulo, [descricao]);
   statusRelato.classList.remove('hidden');
   const semTexto = String(descricao || '').includes(MARCA_PDF_SEM_TEXTO);
-  statusOcr.classList.toggle('hidden', !semTexto);
   // O reconhecimento é de um documento por vez: no lote, a falha fica na lista
   statusOcrIniciar.classList.toggle('hidden', !(semTexto && ultimosArquivos.length === 1));
   pyodideStatusCard.className = 'bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
@@ -724,17 +720,6 @@ function mostrarStatusErro(titulo, descricao) {
   statusDesc.textContent = descricao || 'Verifique o formato do documento.';
   refreshIcons();
 }
-
-// As opções de OCR ficam abaixo da área de envio, longe do erro, e somem quando a área
-// encolhe depois da primeira conversão. O link as mostra, abre o quadro e rola até ele
-statusOcr.addEventListener('click', (evento) => {
-  evento.preventDefault();
-  const ajuda = document.getElementById('ocr-ajuda');
-  document.getElementById('drop-ajuda').classList.remove('hidden');
-  ajuda.open = true;
-  ajuda.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  ajuda.querySelector('summary').focus({ preventScroll: true });
-});
 
 // OCR no navegador para o PDF sem camada de texto. O PDF.js desenha cada página numa
 // imagem e o Tesseract reconhece o texto em português. Tudo vem de vendor/ e só é
