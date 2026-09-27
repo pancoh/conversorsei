@@ -25,6 +25,21 @@ def test_montar_html_contem_estilos_e_resets():
     assert corpo in html
 
 
+def test_contadores_iniciais_ficam_num_irmao_dos_paragrafos_e_nao_no_body():
+    """Com o counter-reset no body, o Chrome numerava 2.3 logo depois de "2.".
+
+    O counter-reset de cada Item_Nivel1 deixava de valer para os subitens seguintes, e a
+    prévia e o arquivo aberto no Chrome emendavam a numeração das seções (o Safari
+    numerava certo). No body::before, irmão dos parágrafos, os dois navegadores acertam,
+    e a regra fica no <style>, que não vai para o SEI na cópia.
+    """
+    html = montar_html('<p class="Item_Nivel1">Teste</p>', contadores={"item-n1": 2})
+    regra_body = html.split("body {", 1)[1].split("}", 1)[0]
+    assert "counter-reset" not in regra_body
+    regra_antes = html.split("body::before {", 1)[1].split("}", 1)[0]
+    assert "counter-reset:item-n1 2 " in regra_antes
+
+
 def test_orcamento_corpo_calculo():
     orcamento_completo = orcamento_corpo(22, so_corpo=False)
     orcamento_apenas_corpo = orcamento_corpo(22, so_corpo=True)

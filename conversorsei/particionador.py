@@ -93,8 +93,10 @@ def montar_html(corpo_html: str, css: str | None = None, contadores: dict[str, i
 <title>Conteúdo formatado para o SEI</title>
 <style>
 body {{font-family:Calibri, sans-serif; font-size:12pt; color:#000; background:#fff;
-      max-width:19cm; margin:1.5em auto; padding:0 1em;
-      counter-reset:{counter_reset};}}
+      max-width:19cm; margin:1.5em auto; padding:0 1em;}}
+/* Os contadores nascem num irmão dos parágrafos, e não no body: com eles no body, o Chrome
+   ignora o counter-reset de cada Item_Nivel1 e emenda os subitens (2.3 logo depois de 2.) */
+body::before {{content:""; display:block; counter-reset:{counter_reset};}}
 table {{border-collapse:collapse;}}
 ul {{margin:6pt 6pt 6pt 40px; padding-left:20px;}}
 li {{font-size:12pt; font-family:Calibri; text-align:justify; margin:3pt 0;}}
