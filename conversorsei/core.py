@@ -12,12 +12,12 @@ from functools import cached_property
 from pathlib import Path
 from zipfile import BadZipFile
 
-from conversao_sei.docx_converter import converter_docx_para_blocos
-from conversao_sei.entrada import FonteDocumento, StreamNomeado
-from conversao_sei.formatacao import CitacaoPorRecuo, trecho_inicial
-from conversao_sei.md_converter import converter_md_para_blocos
-from conversao_sei.odt_converter import converter_odt_para_blocos
-from conversao_sei.particionador import (
+from conversorsei.docx_converter import converter_docx_para_blocos
+from conversorsei.entrada import FonteDocumento, StreamNomeado
+from conversorsei.formatacao import CitacaoPorRecuo, trecho_inicial
+from conversorsei.md_converter import converter_md_para_blocos
+from conversorsei.odt_converter import converter_odt_para_blocos
+from conversorsei.particionador import (
     MAX_KB_PADRAO,
     avancar_contadores,
     contadores_zerados,
@@ -27,8 +27,8 @@ from conversao_sei.particionador import (
     montar_html,
     orcamento_corpo,
 )
-from conversao_sei.pdf_converter import converter_pdf_para_blocos
-from conversao_sei.validador import validar_html_sei
+from conversorsei.pdf_converter import converter_pdf_para_blocos
+from conversorsei.validador import validar_html_sei
 
 EXTENSOES_SUPORTADAS = {".docx", ".pdf", ".md", ".txt", ".odt"}
 # Formatos de editor que não são aceitos, com a orientação para quem ainda os usa. O .rtf

@@ -20,8 +20,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 
-from conversao_sei.cli import main
-from conversao_sei.web import converter_documento_memoria
+from conversorsei.cli import main
+from conversorsei.web import converter_documento_memoria
 
 RE_PARAGRAFO = re.compile(r'<p class="([^"]+)">(.*?)</p>', re.DOTALL)
 CITACAO = "Art. 13. O titular do serviço divulgará os dados."

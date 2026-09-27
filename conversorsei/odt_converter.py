@@ -13,8 +13,8 @@ import zlib
 from dataclasses import replace
 from xml.etree import ElementTree
 
-from conversao_sei.entrada import FonteDocumento, abrir_binario, nome_da_fonte
-from conversao_sei.formatacao import (
+from conversorsei.entrada import FonteDocumento, abrir_binario, nome_da_fonte
+from conversorsei.formatacao import (
     CitacaoPorRecuo,
     Formatacao,
     classe_sei_pelo_nome,
@@ -22,7 +22,7 @@ from conversao_sei.formatacao import (
     linhas_de_assinatura,
     pode_ser_linha_de_assinatura,
 )
-from conversao_sei.md_converter import (
+from conversorsei.md_converter import (
     MARCA_QUEBRA_ODT,
     comeca_com_item,
     converter_texto_md_para_blocos,

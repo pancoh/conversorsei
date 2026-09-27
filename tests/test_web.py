@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from conversao_sei.core import avisos_de_blocos_grandes
-from conversao_sei.particionador import BYTES_POR_KB, LIMITE_SEI_BYTES
-from conversao_sei.web import converter_documento_memoria, converter_memoria_json
+from conversorsei.core import avisos_de_blocos_grandes
+from conversorsei.particionador import BYTES_POR_KB, LIMITE_SEI_BYTES
+from conversorsei.web import converter_documento_memoria, converter_memoria_json
 
 
 def test_converter_documento_memoria_md():
@@ -187,7 +187,7 @@ def test_conversao_web_nao_toca_no_disco(tmp_path, monkeypatch):
 )
 def test_web_e_cli_geram_o_mesmo_html(tmp_path, nome, conteudo):
     """A refatoração não pode fazer a web divergir da CLI: o HTML tem de ser idêntico."""
-    from conversao_sei.core import converter_documento
+    from conversorsei.core import converter_documento
 
     entrada = tmp_path / nome
     entrada.write_bytes(conteudo)
@@ -204,7 +204,7 @@ def test_web_e_cli_geram_o_mesmo_html(tmp_path, nome, conteudo):
 
 def test_web_particiona_e_continua_a_numeracao_como_a_cli(tmp_path):
     """Documento grande: as partes em memória precisam seguir a mesma numeração."""
-    from conversao_sei.core import converter_documento
+    from conversorsei.core import converter_documento
 
     linhas = []
     for i in range(1, 40):
@@ -230,7 +230,7 @@ def _origem_binaria(tmp_path, extensao):
     from tests.test_pdf_converter import _pdf_minimo
 
     if extensao == ".docx":
-        from conversao_sei.md_converter import markdown_para_docx
+        from conversorsei.md_converter import markdown_para_docx
 
         origem = tmp_path / "doc.docx"
         md = tmp_path / "doc.md"
@@ -266,7 +266,7 @@ def test_web_e_cli_geram_o_mesmo_html_nos_formatos_binarios(tmp_path, extensao):
     O .pdf fica de fora de propósito: em disco a extração pode usar o pdftotext e em
     memória usa o pypdf, então os dois lados podem divergir por projeto.
     """
-    from conversao_sei.core import converter_documento
+    from conversorsei.core import converter_documento
 
     origem = _origem_binaria(tmp_path, extensao)
 
@@ -322,7 +322,7 @@ def test_md_com_fim_de_linha_do_windows_converte_igual_ao_unix():
 
 def test_fonte_de_tipo_invalido_falha_com_mensagem_clara():
     """O tipo vem de fora do Python (o to_py do Pyodide): o erro tem de dizer o quê."""
-    from conversao_sei.entrada import abrir_binario
+    from conversorsei.entrada import abrir_binario
 
     with pytest.raises(TypeError, match="Fonte de documento inválida"):
         with abrir_binario(123):  # type: ignore[arg-type]
@@ -406,7 +406,7 @@ def test_sem_item1_nada_e_omitido():
 
 
 def test_cabecalho_vale_para_paragrafos_numerados():
-    from conversao_sei.core import separar_cabecalho
+    from conversorsei.core import separar_cabecalho
 
     blocos = [
         '<p class="Texto_Centralizado">OFÍCIO</p>',

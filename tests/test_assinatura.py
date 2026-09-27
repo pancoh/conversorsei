@@ -12,7 +12,7 @@ import zipfile
 import docx
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-from conversao_sei.web import converter_documento_memoria
+from conversorsei.web import converter_documento_memoria
 
 RE_PARAGRAFO = re.compile(r'<p class="([^"]+)">(.*?)</p>', re.DOTALL)
 CENTRO = WD_ALIGN_PARAGRAPH.CENTER

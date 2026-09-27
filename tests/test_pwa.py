@@ -70,13 +70,13 @@ def test_index_liga_o_manifest_e_o_app_registra_o_service_worker():
 
 
 def test_download_do_bundle_nao_usa_sufixo_de_versao_na_url():
-    """Regressão: "conversao_sei.zip?v=" + Date.now() derruba a conversão sem rede.
+    """Regressão: "conversorsei.zip?v=" + Date.now() derruba a conversão sem rede.
 
     Cada carregamento pediria um endereço novo, que o service worker nunca tem guardado,
     e o motor falharia com "Failed to fetch" logo na inicialização.
     """
     app = APP.read_text(encoding="utf-8")
-    m = re.search(r"fetch\('conversao_sei\.zip([^']*)'", app)
+    m = re.search(r"fetch\('conversorsei\.zip([^']*)'", app)
     assert m, "o download do bundle mudou de forma; confira se ainda funciona sem rede"
     assert m.group(1) == "", "a URL do bundle não pode carregar sufixo de versão"
 

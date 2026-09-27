@@ -1,7 +1,7 @@
 import json
 
-from conversao_sei.cli import main
-from conversao_sei.core import converter_diretorio, converter_documento
+from conversorsei.cli import main
+from conversorsei.core import converter_diretorio, converter_documento
 
 
 def test_core_converter_documento_md(tmp_path):
@@ -139,7 +139,7 @@ def test_exemplo_do_repositorio_converte_sem_avisos(tmp_path):
 
 def test_watch_so_converte_arquivo_estabilizado(tmp_path):
     """A gravação do Word acontece em etapas, e o arquivo só é lido quando para de mudar."""
-    from conversao_sei.cli import ciclo_de_observacao
+    from conversorsei.cli import ciclo_de_observacao
 
     entrada = tmp_path / "entrada"
     entrada.mkdir()
@@ -158,7 +158,7 @@ def test_watch_so_converte_arquivo_estabilizado(tmp_path):
 
 
 def test_watch_reconverte_apos_alteracao_e_esquece_removido(tmp_path):
-    from conversao_sei.cli import ciclo_de_observacao
+    from conversorsei.cli import ciclo_de_observacao
 
     entrada = tmp_path / "entrada"
     entrada.mkdir()
@@ -181,7 +181,7 @@ def test_watch_reconverte_apos_alteracao_e_esquece_removido(tmp_path):
 
 def test_watch_ignora_formato_nao_suportado_e_saida_gerada(tmp_path):
     """O HTML gerado não pode realimentar a observação quando a saída fica dentro da entrada."""
-    from conversao_sei.cli import arquivos_observaveis
+    from conversorsei.cli import arquivos_observaveis
 
     entrada = tmp_path / "entrada"
     entrada.mkdir()
@@ -205,7 +205,7 @@ def test_watch_recusa_saida_com_nome_fixo(tmp_path, capsys):
 
 def test_watch_converte_e_encerra_no_ctrl_c(tmp_path, monkeypatch, capsys):
     """O laço converte o que apareceu e sai limpo no Ctrl+C, sem estourar exceção."""
-    import conversao_sei.cli as cli
+    import conversorsei.cli as cli
 
     entrada = tmp_path / "entrada"
     entrada.mkdir()
@@ -253,7 +253,7 @@ def test_rtf_em_pasta_vira_falha_com_orientacao_e_nao_some(tmp_path, capsys):
     """
     import json
 
-    from conversao_sei.cli import arquivos_observaveis, main
+    from conversorsei.cli import arquivos_observaveis, main
 
     entrada = tmp_path / "entrada"
     entrada.mkdir()
@@ -284,7 +284,7 @@ def test_rtf_em_pasta_vira_falha_com_orientacao_e_nao_some(tmp_path, capsys):
 
 def test_doc_em_pasta_vira_falha_com_orientacao_e_nao_some(tmp_path):
     """O .doc deixado na pasta de entrada recebe a orientação, como o .rtf."""
-    from conversao_sei.cli import arquivos_observaveis
+    from conversorsei.cli import arquivos_observaveis
 
     entrada = tmp_path / "entrada"
     entrada.mkdir()

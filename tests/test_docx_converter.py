@@ -7,7 +7,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-from conversao_sei.docx_converter import (
+from conversorsei.docx_converter import (
     RE_STRIP_ITEM,
     converter_docx_para_blocos,
     converter_docx_para_html,
@@ -270,7 +270,7 @@ def test_docx_hyperlink_vira_ancora(tmp_path):
 
 
 def test_parece_texto_corrido_distingue_titulo_de_paragrafo():
-    from conversao_sei.docx_converter import parece_texto_corrido
+    from conversorsei.docx_converter import parece_texto_corrido
 
     # Títulos de seção: curtos, sem pontuação interna, com ou sem ponto final
     assert not parece_texto_corrido("1. ASSUNTO")

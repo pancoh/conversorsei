@@ -1,5 +1,5 @@
 """
-bundle_web.py — Empacota o diretório conversao_sei em um arquivo ZIP dentro de docs/
+bundle_web.py — Empacota o diretório conversorsei em um arquivo ZIP dentro de docs/
 para ser consumido diretamente pelo Pyodide (WebAssembly) no GitHub Pages.
 
 O ZIP é determinístico: o mesmo conteúdo sempre gera os mesmos bytes, o que permite
@@ -22,8 +22,8 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-SRC_DIR = ROOT / "conversao_sei"
-DEST_ZIP = ROOT / "docs" / "conversao_sei.zip"
+SRC_DIR = ROOT / "conversorsei"
+DEST_ZIP = ROOT / "docs" / "conversorsei.zip"
 INDEX = ROOT / "docs" / "index.html"
 # Arquivos da página que o index.html chama com marca de versão
 ARQUIVOS_COM_VERSAO = ("app.js", "estilos.css")
@@ -84,7 +84,7 @@ def verificar_bundle(destino: Path = DEST_ZIP) -> bool:
         return False
     if destino.read_bytes() != conteudo:
         print(
-            f"ERRO: {destino} está defasado em relação a conversao_sei/.\n"
+            f"ERRO: {destino} está defasado em relação a conversorsei/.\n"
             "Rode 'python scripts/bundle_web.py' e inclua o arquivo no commit.",
             file=sys.stderr,
         )
@@ -131,7 +131,7 @@ def verificar_versoes() -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Gera (ou verifica) o bundle web do conversao_sei.")
+    parser = argparse.ArgumentParser(description="Gera (ou verifica) o bundle web do conversorsei.")
     parser.add_argument(
         "--verificar",
         action="store_true",

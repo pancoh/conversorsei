@@ -1,4 +1,4 @@
-from conversao_sei.validador import validar_html_sei
+from conversorsei.validador import validar_html_sei
 
 
 def test_validar_html_sei_correto():

@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from conversao_sei.core import EXTENSOES_SUPORTADAS, converter_bytes
+from conversorsei.core import EXTENSOES_SUPORTADAS, converter_bytes
 
 RAIZ = Path(__file__).resolve().parent.parent
 CORPUS = RAIZ / "tests" / "corpus"

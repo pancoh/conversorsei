@@ -21,9 +21,9 @@ from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.shared import Cm, Pt
 
-from conversao_sei.formatacao import classes_sei
-from conversao_sei.odt_converter import extrair_markdown_odt
-from conversao_sei.web import converter_documento_memoria
+from conversorsei.formatacao import classes_sei
+from conversorsei.odt_converter import extrair_markdown_odt
+from conversorsei.web import converter_documento_memoria
 
 RE_PARAGRAFO = re.compile(r'<(p|li) class="([^"]+)">(.*?)</\1>', re.DOTALL)
 
@@ -252,14 +252,14 @@ def test_titulo_numerado_do_markdown_continua_item():
     ],
 )
 def test_validador_aponta_marcacao_markdown_que_sobrou(trecho, aviso):
-    from conversao_sei.validador import validar_html_sei
+    from conversorsei.validador import validar_html_sei
 
     assert any(aviso in falha for falha in validar_html_sei(trecho, validar_tamanho=False))
 
 
 def test_texto_extraido_com_til_nao_vira_riscado():
     """Um "~~" que é conteúdo do documento (ODT, PDF) chega escapado e não risca nada."""
-    from conversao_sei.md_converter import converter_texto_md_para_blocos, escapar_markdown
+    from conversorsei.md_converter import converter_texto_md_para_blocos, escapar_markdown
 
     blocos = converter_texto_md_para_blocos(escapar_markdown("valor ~~aproximado~~ do índice"))
     assert "<s>" not in blocos[0]

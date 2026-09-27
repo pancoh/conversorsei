@@ -18,8 +18,8 @@ from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
-from conversao_sei.entrada import FonteDocumento, abrir_binario
-from conversao_sei.formatacao import (
+from conversorsei.entrada import FonteDocumento, abrir_binario
+from conversorsei.formatacao import (
     CLASSE_ASSINATURA,
     CitacaoPorRecuo,
     Formatacao,

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from conversao_sei.particionador import (
+from conversorsei.particionador import (
     css_institucional,
     derivar_caminho_saida,
     dividir_em_partes,
@@ -64,7 +64,7 @@ def test_derivar_caminho_saida():
 
 
 def test_avancar_contadores_acompanha_niveis():
-    from conversao_sei.particionador import avancar_contadores, contadores_zerados
+    from conversorsei.particionador import avancar_contadores, contadores_zerados
 
     corpo = (
         '<p class="Item_Nivel1">A</p>'
@@ -86,7 +86,7 @@ def test_montar_html_continua_numeracao_da_parte_anterior():
 
 
 def test_partes_seguintes_continuam_a_numeracao(tmp_path):
-    from conversao_sei.core import converter_documento
+    from conversorsei.core import converter_documento
 
     linhas = []
     for i in range(1, 40):
@@ -122,7 +122,7 @@ def _linha(i: int, tamanho: int = 400) -> str:
 
 
 def test_dividir_tabela_repete_cabecalho_em_cada_parte():
-    from conversao_sei.particionador import dividir_tabela
+    from conversorsei.particionador import dividir_tabela
 
     tabela = _tabela_html([_linha(i) for i in range(60)])
     assert len(tabela.encode("utf-8")) > 20_000
@@ -143,7 +143,7 @@ def test_dividir_tabela_repete_cabecalho_em_cada_parte():
 
 
 def test_dividir_tabela_nao_parte_celula_mesclada():
-    from conversao_sei.particionador import dividir_tabela
+    from conversorsei.particionador import dividir_tabela
 
     # Cada par de linhas é amarrado por um rowspan="2" iniciado na linha par
     corpo = []
@@ -165,7 +165,7 @@ def test_dividir_tabela_nao_parte_celula_mesclada():
 
 
 def test_dividir_tabela_ignora_bloco_que_nao_e_tabela():
-    from conversao_sei.particionador import dividir_tabela
+    from conversorsei.particionador import dividir_tabela
 
     paragrafo = f'<p class="Texto_Justificado">{"a" * 9000}</p>'
     assert dividir_tabela(paragrafo, max_bytes=1000) == [paragrafo]

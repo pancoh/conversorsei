@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from conversao_sei.core import (
+from conversorsei.core import (
     EXTENSOES_RECONHECIDAS,
     EXTENSOES_SUPORTADAS,
     ResultadoConversao,
@@ -18,7 +18,7 @@ from conversao_sei.core import (
     converter_documento,
     entra_na_varredura,
 )
-from conversao_sei.particionador import MAX_KB_PADRAO
+from conversorsei.particionador import MAX_KB_PADRAO
 
 INTERVALO_WATCH_PADRAO = 2.0
 

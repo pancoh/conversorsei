@@ -8,8 +8,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from conversao_sei.entrada import FonteDocumento, abrir_binario, nome_da_fonte
-from conversao_sei.md_converter import converter_texto_md_para_blocos, escapar_markdown
+from conversorsei.entrada import FonteDocumento, abrir_binario, nome_da_fonte
+from conversorsei.md_converter import converter_texto_md_para_blocos, escapar_markdown
 
 # ---------------------------------------------------------------------------
 # Extração bruta de texto (pdftotext prioritário, pypdf como fallback)

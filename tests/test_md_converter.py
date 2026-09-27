@@ -1,8 +1,8 @@
 import docx
 from docx.oxml.ns import qn
 
-from conversao_sei.md_converter import converter_md_para_blocos, converter_md_para_html, markdown_para_docx
-from conversao_sei.web import converter_documento_memoria
+from conversorsei.md_converter import converter_md_para_blocos, converter_md_para_html, markdown_para_docx
+from conversorsei.web import converter_documento_memoria
 
 
 def test_md_conversao_tabela_e_links(tmp_path):

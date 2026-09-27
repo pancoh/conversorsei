@@ -6,8 +6,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from conversao_sei.particionador import LIMITE_SEI_BYTES
-from conversao_sei.recursos import obter_estilos_sei
+from conversorsei.particionador import LIMITE_SEI_BYTES
+from conversorsei.recursos import obter_estilos_sei
 
 CLASSES_VALIDAS_SEI = {
     "Citação",

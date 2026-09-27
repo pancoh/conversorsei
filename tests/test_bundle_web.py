@@ -13,13 +13,13 @@ def test_bundle_e_deterministico():
     primeiro, arquivos = bundle_web.gerar_bytes_zip()
     segundo, _ = bundle_web.gerar_bytes_zip()
     assert primeiro == segundo
-    assert "conversao_sei/web.py" in arquivos
-    assert "conversao_sei/recursos/estilos_sei.css" in arquivos
+    assert "conversorsei/web.py" in arquivos
+    assert "conversorsei/recursos/estilos_sei.css" in arquivos
     assert not any("__pycache__" in a for a in arquivos)
 
 
 def test_bundle_versionado_esta_sincronizado():
-    """docs/conversao_sei.zip precisa refletir o código-fonte atual."""
+    """docs/conversorsei.zip precisa refletir o código-fonte atual."""
     assert bundle_web.verificar_bundle() is True
 
 

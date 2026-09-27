@@ -1,5 +1,5 @@
-from conversao_sei.md_converter import converter_md_para_html
-from conversao_sei.pdf_converter import (
+from conversorsei.md_converter import converter_md_para_html
+from conversorsei.pdf_converter import (
     estruturar_texto_para_markdown,
     limpar_boilerplate_sei,
     remontar_numeracao,
@@ -77,7 +77,7 @@ def _pdf_minimo(caminho, linhas):
 
 def test_pdf_conversao_ponta_a_ponta(tmp_path):
     """PDF -> texto -> limpeza -> markdown -> blocos SEI, sem sobras de boilerplate."""
-    from conversao_sei.core import converter_documento
+    from conversorsei.core import converter_documento
 
     pdf = _pdf_minimo(
         tmp_path / "despacho.pdf",
@@ -111,7 +111,7 @@ def test_pdf_extracao_funciona_sem_pdftotext(tmp_path, monkeypatch):
     """O fallback em pypdf precisa funcionar: o runner do CI não tem o binário pdftotext."""
     import shutil as shutil_mod
 
-    from conversao_sei import pdf_converter
+    from conversorsei import pdf_converter
 
     monkeypatch.setattr(pdf_converter.shutil, "which", lambda _: None)
     assert shutil_mod.which  # o módulo real segue intacto
@@ -218,7 +218,7 @@ def test_pdf_sem_camada_de_texto_avisa_sobre_ocr(tmp_path):
     """PDF digitalizado nao tem o que extrair: o erro precisa dizer isso."""
     import pytest
 
-    from conversao_sei import pdf_converter
+    from conversorsei import pdf_converter
 
     pdf = _pdf_minimo(tmp_path / "digitalizado.pdf", [])
     with pytest.raises(RuntimeError, match="camada de texto"):
@@ -249,7 +249,7 @@ def test_pdftotext_decodificado_como_utf8(tmp_path, monkeypatch):
     """
     import subprocess
 
-    from conversao_sei import pdf_converter
+    from conversorsei import pdf_converter
 
     chamada = {}
 
@@ -274,7 +274,7 @@ def test_pdf_para_blocos_nao_grava_arquivo_temporario(tmp_path, monkeypatch):
     """
     import tempfile
 
-    from conversao_sei import pdf_converter
+    from conversorsei import pdf_converter
 
     def proibido(*args, **kwargs):
         raise AssertionError("a conversão de PDF não deve criar diretório temporário")

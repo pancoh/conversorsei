@@ -23,7 +23,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-from conversao_sei.validador import obter_classes_validas_css
+from conversorsei.validador import obter_classes_validas_css
 
 # Tabela_Texto_8 e Tabela_Texto_10 são as variantes em fonte menor das células
 FONTE_MAXIMA_TABELA_8_PT = 8.0

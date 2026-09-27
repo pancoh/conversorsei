@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from conversao_sei.core import converter_documento
-from conversao_sei.odt_converter import extrair_markdown_odt
+from conversorsei.core import converter_documento
+from conversorsei.odt_converter import extrair_markdown_odt
 
 CONTENT_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content

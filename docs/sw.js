@@ -12,7 +12,7 @@
 // segundo plano, o navegador ficava com a página nova e o app.js antigo por várias
 // visitas (o GitHub Pages ainda deixa o cache HTTP guardá-los por 10 minutos).
 
-const VERSAO = 'v7';
+const VERSAO = 'v8';
 const CACHE_ESTATICO = `conversao-sei-estatico-${VERSAO}`;
 const CACHE_EXECUCAO = `conversao-sei-execucao-${VERSAO}`;
 
@@ -26,7 +26,7 @@ const ARQUIVOS_ESSENCIAIS = [
   './icons/marca-conversor.svg',
   './icons/conversor-sei-192-v2.png',
   './icons/conversor-sei-512-v2.png',
-  './conversao_sei.zip',
+  './conversorsei.zip',
   './estilos.css',
   './vendor/fonts.css',
   './vendor/jszip-3.10.1.min.js',

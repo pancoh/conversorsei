@@ -23,9 +23,9 @@ from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.shared import Cm, Pt, RGBColor
 
-from conversao_sei.docx_converter import converter_docx_para_blocos, profundidade_item
-from conversao_sei.entrada import FonteDocumento, ler_bytes
-from conversao_sei.formatacao import (
+from conversorsei.docx_converter import converter_docx_para_blocos, profundidade_item
+from conversorsei.entrada import FonteDocumento, ler_bytes
+from conversorsei.formatacao import (
     CLASSE_ASSINATURA,
     CitacaoPorRecuo,
     Formatacao,

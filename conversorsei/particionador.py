@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from conversao_sei.recursos import obter_estilos_sei
+from conversorsei.recursos import obter_estilos_sei
 
 # Limite em bytes a partir do qual o plugin SEI Pro perde estilos ao colar
 LIMITE_SEI_BYTES = 27_000

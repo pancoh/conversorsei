@@ -71,7 +71,7 @@ uv run pytest -m e2e                      # teste no navegador (Chromium e WebKi
 
 A página publicada fica em `docs/` e roda o mesmo pacote Python no navegador, pelo Pyodide.
 
-- Mudou algo em `conversao_sei/`, `docs/app.js` ou `docs/estilos.css`: rode
+- Mudou algo em `conversorsei/`, `docs/app.js` ou `docs/estilos.css`: rode
   `uv run python scripts/bundle_web.py` e inclua o resultado no commit.
 - Usou uma classe nova do Tailwind: recompile o CSS e rode o `bundle_web.py` de novo.
 

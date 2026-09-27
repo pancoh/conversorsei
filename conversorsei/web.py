@@ -7,8 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from conversao_sei.core import converter_bytes
-from conversao_sei.particionador import BYTES_POR_KB, LIMITE_SEI_BYTES, MAX_KB_PADRAO
+from conversorsei.core import converter_bytes
+from conversorsei.particionador import BYTES_POR_KB, LIMITE_SEI_BYTES, MAX_KB_PADRAO
 
 
 def nome_seguro(nome_arquivo: str) -> str:

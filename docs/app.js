@@ -380,14 +380,14 @@ async function initPyodide() {
     statusTitle.textContent = 'Preparando o conversor (4 de 4)...';
     statusDesc.textContent = 'Carregando as regras e os estilos do SEI.';
 
-    // Baixa o ZIP do conversao_sei e descompacta no sistema de arquivos virtual do Pyodide.
+    // Baixa o ZIP do conversorsei e descompacta no sistema de arquivos virtual do Pyodide.
     // Sem sufixo de versão na URL: cada valor novo seria um endereço que o service worker
     // nunca tem em cache, e a página deixaria de abrir sem rede. O 'no-cache' revalida
     // com o servidor quando há rede, e o service worker responde quando não há.
-    enderecoEmCarga = new URL('conversao_sei.zip', window.location.href).href;
-    const response = await comAvisoDeDemora(fetch('conversao_sei.zip', { cache: 'no-cache' }), 20000);
+    enderecoEmCarga = new URL('conversorsei.zip', window.location.href).href;
+    const response = await comAvisoDeDemora(fetch('conversorsei.zip', { cache: 'no-cache' }), 20000);
     if (!response.ok) {
-      throw new Error('Falha ao baixar conversao_sei.zip: ' + response.statusText);
+      throw new Error('Falha ao baixar conversorsei.zip: ' + response.statusText);
     }
     const zipArrayBuffer = await response.arrayBuffer();
     pyodideInstance.unpackArchive(zipArrayBuffer, 'zip');
@@ -396,9 +396,9 @@ async function initPyodide() {
     enderecoEmCarga = null;
     await pyodideInstance.runPythonAsync(`
 import sys
-import conversao_sei
-from conversao_sei.web import converter_memoria_json
-print("conversao_sei pronto versão:", conversao_sei.__version__)
+import conversorsei
+from conversorsei.web import converter_memoria_json
+print("conversorsei pronto versão:", conversorsei.__version__)
 `);
 
     isPyodideReady = true;
@@ -709,9 +709,9 @@ async function converterArquivo(file, opcoes) {
     const argCabecalho = opcoes.omitirCabecalho ? '\n    omitir_cabecalho=True,' : '';
 
     const jsonStr = await pyodideInstance.runPythonAsync(`
-import conversao_sei.web
+import conversorsei.web
 
-res_json = conversao_sei.web.converter_memoria_json(
+res_json = conversorsei.web.converter_memoria_json(
     nome_arquivo=temp_filename,
     conteudo_bytes=bytes(temp_bytes.to_py()),
     # Sempre o HTML completo: "só o corpo" servia apenas ao Inserir HTML do SEI Pro e saiu
@@ -1143,7 +1143,7 @@ async function downloadAllZip() {
   });
 
   const baseName = currentOriginalName.replace(/\.[^/.]+$/, '');
-  const zipFilename = emLote ? 'conversao_sei_lote.zip' : `${baseName}_SEI_partes.zip`;
+  const zipFilename = emLote ? 'conversorsei_lote.zip' : `${baseName}_SEI_partes.zip`;
 
   const blob = await zip.generateAsync({ type: 'blob' });
   triggerBlobDownload(zipFilename, blob);

@@ -21,7 +21,7 @@
 | Markdown | .md | Converte títulos, listas e tabelas |
 | Texto | .txt | Estrutura parágrafos automaticamente |
 
-2.4. A documentação completa está em [https://github.com/pancoh/conversao_sei](https://github.com/pancoh/conversao_sei).
+2.4. A documentação completa está em [https://github.com/pancoh/conversorsei](https://github.com/pancoh/conversorsei).
 
 # 3. CONCLUSÃO
 
