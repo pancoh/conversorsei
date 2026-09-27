@@ -1091,7 +1091,7 @@ function renderResults(result) {
   // Avisos de validação
   if (result.avisos && result.avisos.length > 0) {
     resWarningsCard.classList.remove('hidden');
-    resWarningsList.innerHTML = result.avisos.map(a => `<li>${escapeHtml(a)}</li>`).join('');
+    resWarningsList.innerHTML = result.avisos.map(a => `<li>${comLinks(a)}</li>`).join('');
   } else {
     resWarningsCard.classList.add('hidden');
     resWarningsList.innerHTML = '';
@@ -1380,6 +1380,14 @@ document.addEventListener('keydown', (e) => {
     focaveis[e.shiftKey ? focaveis.length - 1 : 0].focus();
   }
 });
+
+// Endereço https de um aviso vira link, depois de o texto ser escapado. O aviso do OCR
+// indica um serviço online, e a pessoa teria de copiar o endereço à mão. A pontuação que
+// fecha a frase fica fora do link
+function comLinks(texto) {
+  return escapeHtml(texto).replace(/https:\/\/[^\s<]*[^\s<.,;:)]/g, (url) =>
+    `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-semibold underline">${url}</a>`);
+}
 
 function escapeHtml(text) {
   const map = {

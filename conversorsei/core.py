@@ -43,12 +43,13 @@ FORMATOS_RETIRADOS = {
 # em silêncio (um .rtf ou .doc deixado na pasta de entrada simplesmente sumiria da conversão).
 EXTENSOES_RECONHECIDAS = frozenset(EXTENSOES_SUPORTADAS | FORMATOS_RETIRADOS.keys())
 # O OCR erra letras e números sem aviso: o resultado precisa de conferência. Para muitos
-# erros, o caminho é outro motor de OCR ou o original, porque o OCRmyPDF, com o mesmo
-# Tesseract, dá o mesmo resultado
+# erros, o caminho é o original ou outro programa de OCR (o OCRmyPDF ficou de fora: usa o
+# mesmo Tesseract e deu o mesmo resultado). O endereço vira link na página
 AVISO_OCR = (
     "Texto reconhecido por OCR, que pode conter erros: confira nomes, números, datas e valores com o "
     "original antes de salvar no SEI. Se houver muitos erros, peça o documento original em Word (.docx) "
-    "ou use um programa de OCR com outro motor, como o Adobe Acrobat ou o ABBYY FineReader."
+    "ou use outro programa de OCR: o PDF24 (https://tools.pdf24.org/pt/ocr-pdf), online, que envia o "
+    "documento aos servidores do serviço, ou o Adobe Acrobat e o ABBYY FineReader, instalados no computador."
 )
 
 

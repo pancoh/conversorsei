@@ -431,7 +431,10 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     assert "ASSUNTO" in html and "CONCLUSAO" in html
     assert "padronizacao dos relatorios mensais" in html
     avisos = pagina.locator("#res-warnings-list").inner_text()
-    assert "reconhecido por OCR, que pode conter erros" in avisos and "outro motor" in avisos
+    assert "reconhecido por OCR, que pode conter erros" in avisos and "PDF24" in avisos
+    link = pagina.locator("#res-warnings-list a")
+    assert link.get_attribute("href") == "https://tools.pdf24.org/pt/ocr-pdf"
+    assert link.get_attribute("rel") == "noopener noreferrer"
 
     # O campo fica no painel de opções, fechado: muda o valor como a pessoa faria ao sair dele
     pagina.evaluate(
