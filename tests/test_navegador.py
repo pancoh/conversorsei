@@ -32,6 +32,8 @@ DOCS = Path(__file__).resolve().parent.parent / "docs"
 # O Pyodide vem do CDN na primeira visita: em rede lenta, o carregamento passa de um minuto
 PRAZO_CARREGAMENTO_MS = 240_000
 PRAZO_CONVERSAO_MS = 60_000
+# O OCR de uma página leva segundos; o prazo cobre o download das bibliotecas numa rede lenta
+PRAZO_OCR_MS = 120_000
 # Atraso dos arquivos lentos no teste da troca de domínio
 ATRASO_S = 2
 PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
@@ -402,6 +404,8 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     pagina = contexto.new_page()  # type: ignore[attr-defined]
     erros: list[str] = []
     pagina.on("pageerror", lambda erro: erros.append(str(erro)))
+    console: list[str] = []
+    pagina.on("console", lambda msg: console.append(f"{msg.type}: {msg.text}"))
 
     # A "digitalização": o texto vira imagem, sem nenhuma fonte no PDF
     pagina.set_viewport_size({"width": 794, "height": 1123})
@@ -416,7 +420,17 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     )
     pagina.locator("#status-ocr-iniciar").wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
     pagina.click("#status-ocr-iniciar")
-    pagina.locator("button.btn-copy").wait_for(state="visible", timeout=PRAZO_CARREGAMENTO_MS)
+    # Termina no resultado ou num erro: esperar só o resultado deixava um erro do OCR
+    # parado até o fim do prazo, sem dizer qual era
+    pagina.wait_for_function(
+        "() => document.querySelector('button.btn-copy')"
+        " || !document.getElementById('status-relato').classList.contains('hidden')",
+        timeout=PRAZO_OCR_MS,
+    )
+    if not pagina.locator("button.btn-copy").count():
+        # O quadro de situação mostra a etapa e o andamento do OCR, ou o erro
+        situacao = pagina.locator("#pyodide-status-card").inner_text()
+        pytest.fail(f"O OCR não terminou. Situação: {situacao!r}. Console: {console[-20:]} Erros: {erros}")
 
     html = pagina.evaluate("() => currentResultFiles[0].conteudo")
     assert 'class="Item_Nivel1"' in html

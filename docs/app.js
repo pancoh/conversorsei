@@ -774,17 +774,37 @@ function carregarScriptLocal(src) {
   });
 }
 
-async function reconhecerTextoDoPdf(file, aoAvancar) {
+// Etapas do Tesseract, na língua da página. O andamento aparece no quadro de situação:
+// num celular lento, o reconhecimento leva minutos, e sem ele a página parecia parada
+const ETAPAS_DO_TESSERACT = {
+  'loading tesseract core': 'Carregando o motor de OCR',
+  'initializing tesseract': 'Iniciando o motor de OCR',
+  'loading language traineddata': 'Carregando o modelo de português',
+  'initializing api': 'Iniciando o reconhecimento',
+  'recognizing text': 'Reconhecendo',
+};
+
+// `informar(titulo, detalhe)` recebe cada etapa: o título diz a etapa, e o detalhe, o
+// andamento dentro dela
+async function reconhecerTextoDoPdf(file, informar) {
+  informar('Carregando o OCR...');
   const pdfjs = await import(enderecoLocal(OCR.pdfjs));
   pdfjs.GlobalWorkerOptions.workerSrc = enderecoLocal(OCR.pdfjsWorker);
   if (!window.Tesseract) await carregarScriptLocal(enderecoLocal(OCR.tesseract));
 
+  informar('Abrindo o PDF...');
   const carregamento = pdfjs.getDocument({
     data: new Uint8Array(await file.arrayBuffer()),
     wasmUrl: enderecoLocal(OCR.pdfjsWasm),
     isEvalSupported: false,
+    // JPEG pelo decodificador do próprio PDF.js, e não pelo ImageDecoder do navegador:
+    // no WebKit de Linux, a página em JPEG (o formato comum da digitalização) saía em
+    // branco, sem erro, e o OCR não achava texto
+    isImageDecoderSupported: false,
   });
   const pdf = await carregamento.promise;
+  let tituloDaPagina = 'Preparando o motor de OCR...';
+  informar(tituloDaPagina);
   // O worker vem do próprio site, e não de um blob: assim o service worker o controla e
   // guarda o motor e o modelo para uso sem rede. O cache do Tesseract (IndexedDB) seria
   // uma segunda cópia do modelo
@@ -794,11 +814,17 @@ async function reconhecerTextoDoPdf(file, aoAvancar) {
     langPath: enderecoLocal(OCR.tessdata),
     workerBlobURL: false,
     cacheMethod: 'none',
+    logger: (m) => {
+      const etapa = ETAPAS_DO_TESSERACT[m.status] || m.status;
+      const porcento = typeof m.progress === 'number' ? ` (${Math.round(m.progress * 100)}%)` : '';
+      informar(tituloDaPagina, `${etapa}${porcento}`);
+    },
   });
   try {
     const paginas = [];
     for (let numero = 1; numero <= pdf.numPages; numero++) {
-      aoAvancar(numero, pdf.numPages);
+      tituloDaPagina = `Reconhecendo o texto: página ${numero} de ${pdf.numPages}...`;
+      informar(tituloDaPagina);
       const pagina = await pdf.getPage(numero);
       const viewport = pagina.getViewport({ scale: ESCALA_OCR });
       const canvas = document.createElement('canvas');
@@ -824,13 +850,14 @@ statusOcrIniciar.addEventListener('click', async () => {
   const file = ultimosArquivos[0];
   if (!file || ultimosArquivos.length !== 1) return;
   const selecao = numeroDaSelecao;
-  mostrarStatusProcessando(`Preparando o reconhecimento de texto de ${file.name}...`);
-  statusDesc.textContent = 'Na primeira vez, a página baixa cerca de 7 MB. Depois, funciona sem internet.';
+  mostrarStatusProcessando(`Reconhecendo o texto de ${file.name}...`);
+  const aviso = 'O reconhecimento roda no navegador, e o documento não sai do computador. '
+    + 'O texto reconhecido pode conter erros. Na primeira vez, a página baixa cerca de 7 MB.';
   try {
-    const texto = await reconhecerTextoDoPdf(file, (numero, total) => {
+    const texto = await reconhecerTextoDoPdf(file, (titulo, detalhe) => {
       if (selecao !== numeroDaSelecao) return;
-      statusTitle.textContent = `Reconhecendo o texto: página ${numero} de ${total}...`;
-      statusDesc.textContent = 'O reconhecimento roda no navegador, e o documento não sai do computador. O texto reconhecido pode conter erros.';
+      statusTitle.textContent = titulo;
+      statusDesc.textContent = detalhe ? `${detalhe}. ${aviso}` : aviso;
     });
     textosReconhecidos.set(file, texto);
   } catch (err) {
