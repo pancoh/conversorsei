@@ -29,6 +29,7 @@ const statusTitle = document.getElementById('status-title');
 const statusDesc = document.getElementById('status-desc');
 const statusRelato = document.getElementById('status-relato');
 const statusOcr = document.getElementById('status-ocr');
+const statusOcrIniciar = document.getElementById('status-ocr-iniciar');
 
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
@@ -676,6 +677,7 @@ function reativarResultado() {
 function mostrarStatusProcessando(titulo) {
   statusRelato.classList.add('hidden');
   statusOcr.classList.add('hidden');
+  statusOcrIniciar.classList.add('hidden');
   pyodideStatusCard.className = 'bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
   statusSpinner.className = 'animate-spin text-blue-600';
   statusSpinner.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5"></i>';
@@ -692,6 +694,7 @@ function mostrarStatusProcessando(titulo) {
 function mostrarStatusDiscreto(texto) {
   statusRelato.classList.add('hidden');
   statusOcr.classList.add('hidden');
+  statusOcrIniciar.classList.add('hidden');
   pyodideStatusCard.className = 'flex items-center px-1';
   statusSpinner.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-emerald-700"></i>';
   statusSpinner.className = '';
@@ -708,7 +711,10 @@ const MARCA_PDF_SEM_TEXTO = 'não tem camada de texto';
 function mostrarStatusErro(titulo, descricao) {
   registrarParaRelato(titulo, [descricao]);
   statusRelato.classList.remove('hidden');
-  statusOcr.classList.toggle('hidden', !String(descricao || '').includes(MARCA_PDF_SEM_TEXTO));
+  const semTexto = String(descricao || '').includes(MARCA_PDF_SEM_TEXTO);
+  statusOcr.classList.toggle('hidden', !semTexto);
+  // O reconhecimento é de um documento por vez: no lote, a falha fica na lista
+  statusOcrIniciar.classList.toggle('hidden', !(semTexto && ultimosArquivos.length === 1));
   pyodideStatusCard.className = 'bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
   statusSpinner.innerHTML = '<i data-lucide="alert-circle" class="w-5 h-5 text-rose-600"></i>';
   statusSpinner.className = '';
@@ -730,10 +736,119 @@ statusOcr.addEventListener('click', (evento) => {
   ajuda.querySelector('summary').focus({ preventScroll: true });
 });
 
+// OCR no navegador para o PDF sem camada de texto. O PDF.js desenha cada página numa
+// imagem e o Tesseract reconhece o texto em português. Tudo vem de vendor/ e só é
+// baixado quando alguém pede o reconhecimento: são cerca de 7 MB, e a maioria dos
+// documentos não precisa deles. O documento não sai do navegador
+const OCR = {
+  pdfjs: 'vendor/pdfjs-6.3.289/pdf.min.js',
+  pdfjsWorker: 'vendor/pdfjs-6.3.289/pdf.worker.min.js',
+  // Decodificadores de imagem (JBIG2 e JPEG 2000), comuns em documento digitalizado
+  pdfjsWasm: 'vendor/pdfjs-6.3.289/wasm/',
+  tesseract: 'vendor/tesseract-7.0.0/tesseract.min.js',
+  tesseractWorker: 'vendor/tesseract-7.0.0/worker.min.js',
+  // O Tesseract escolhe a variante do motor que o navegador suporta (com ou sem SIMD)
+  tesseractCore: 'vendor/tesseract-core-7.0.0',
+  // Modelo de português compacto (best_int): 1,3 MB, com a precisão do modelo completo
+  tessdata: 'vendor/tessdata-4.0.0-best-int',
+};
+// A página vira imagem a 216 dpi (3 x 72). Menos que isso, o Tesseract erra letras
+// pequenas; mais, a imagem de uma página A4 passa do limite de canvas do Safari no iPhone
+const ESCALA_OCR = 3;
+
+// O texto reconhecido fica guardado por arquivo: mudar uma opção converte de novo os
+// mesmos arquivos, e sem isso o PDF voltaria a falhar por falta de texto
+const textosReconhecidos = new WeakMap();
+
+function enderecoLocal(caminho) {
+  return new URL(caminho, window.location.href).href;
+}
+
+function carregarScriptLocal(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`Falha ao carregar ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+async function reconhecerTextoDoPdf(file, aoAvancar) {
+  const pdfjs = await import(enderecoLocal(OCR.pdfjs));
+  pdfjs.GlobalWorkerOptions.workerSrc = enderecoLocal(OCR.pdfjsWorker);
+  if (!window.Tesseract) await carregarScriptLocal(enderecoLocal(OCR.tesseract));
+
+  const carregamento = pdfjs.getDocument({
+    data: new Uint8Array(await file.arrayBuffer()),
+    wasmUrl: enderecoLocal(OCR.pdfjsWasm),
+    isEvalSupported: false,
+  });
+  const pdf = await carregamento.promise;
+  // O worker vem do próprio site, e não de um blob: assim o service worker o controla e
+  // guarda o motor e o modelo para uso sem rede. O cache do Tesseract (IndexedDB) seria
+  // uma segunda cópia do modelo
+  const reconhecedor = await window.Tesseract.createWorker('por', window.Tesseract.OEM.LSTM_ONLY, {
+    workerPath: enderecoLocal(OCR.tesseractWorker),
+    corePath: enderecoLocal(OCR.tesseractCore),
+    langPath: enderecoLocal(OCR.tessdata),
+    workerBlobURL: false,
+    cacheMethod: 'none',
+  });
+  try {
+    const paginas = [];
+    for (let numero = 1; numero <= pdf.numPages; numero++) {
+      aoAvancar(numero, pdf.numPages);
+      const pagina = await pdf.getPage(numero);
+      const viewport = pagina.getViewport({ scale: ESCALA_OCR });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await pagina.render({ canvas, viewport }).promise;
+      const { data } = await reconhecedor.recognize(canvas);
+      paginas.push(data.text);
+      pagina.cleanup();
+      // Devolve a memória da imagem antes da próxima página
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+    return paginas.join('\n\n');
+  } finally {
+    await reconhecedor.terminate();
+    // No PDF.js 6, quem libera o documento e o worker dele é a tarefa de carregamento
+    await carregamento.destroy();
+  }
+}
+
+statusOcrIniciar.addEventListener('click', async () => {
+  const file = ultimosArquivos[0];
+  if (!file || ultimosArquivos.length !== 1) return;
+  const selecao = numeroDaSelecao;
+  mostrarStatusProcessando(`Preparando o reconhecimento de texto de ${file.name}...`);
+  statusDesc.textContent = 'Na primeira vez, a página baixa cerca de 7 MB. Depois, funciona sem internet.';
+  try {
+    const texto = await reconhecerTextoDoPdf(file, (numero, total) => {
+      if (selecao !== numeroDaSelecao) return;
+      statusTitle.textContent = `Reconhecendo o texto: página ${numero} de ${total}...`;
+      statusDesc.textContent = 'O reconhecimento roda no navegador, e o documento não sai do computador. O texto reconhecido pode conter erros.';
+    });
+    textosReconhecidos.set(file, texto);
+  } catch (err) {
+    if (selecao !== numeroDaSelecao) return;
+    console.error('Erro no OCR:', err);
+    mostrarStatusErro('Não foi possível reconhecer o texto', err.message || String(err));
+    return;
+  }
+  // Outra seleção durante o reconhecimento: o texto fica guardado, mas a tela é dela
+  if (selecao !== numeroDaSelecao) return;
+  processFiles(ultimosArquivos);
+});
+
 // Converte um arquivo e devolve o resultado já decodificado do Python
 async function converterArquivo(file, opcoes) {
   const arrayBuffer = await file.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
+  const textoReconhecido = textosReconhecidos.get(file);
 
   return executarNoPyodide(async () => {
     pyodideInstance.globals.set('temp_filename', file.name);
@@ -744,6 +859,8 @@ async function converterArquivo(file, opcoes) {
     // continua convertendo normalmente
     const argCitacao = opcoes.citacaoPorRecuo ? '\n    citacao_por_recuo=True,' : '';
     const argCabecalho = opcoes.omitirCabecalho ? '\n    omitir_cabecalho=True,' : '';
+    if (textoReconhecido !== undefined) pyodideInstance.globals.set('temp_texto_reconhecido', textoReconhecido);
+    const argOcr = textoReconhecido !== undefined ? '\n    texto_reconhecido=temp_texto_reconhecido,' : '';
 
     const jsonStr = await pyodideInstance.runPythonAsync(`
 import conversorsei.web
@@ -756,11 +873,12 @@ res_json = conversorsei.web.converter_memoria_json(
     so_corpo=False,
     forcar_unico=bool(temp_forcar_unico),
     max_kb=int(temp_max_kb),
-    validar=True,${argCitacao}${argCabecalho}
+    validar=True,${argCitacao}${argCabecalho}${argOcr}
 )
 # Sem isto o documento inteiro fica preso no dicionário global do Python até a
 # conversão seguinte, o que pesa no modo em lote
 del temp_bytes
+globals().pop('temp_texto_reconhecido', None)
 res_json
 `);
 

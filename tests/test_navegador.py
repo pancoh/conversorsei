@@ -257,7 +257,7 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     pagina.click("#status-ocr")
     pagina.locator("#ocr-ajuda").wait_for(state="visible")
     assert pagina.locator("#ocr-ajuda").evaluate("el => el.open")
-    pagina.locator("#ocr-ajuda a", has_text="OCRmyPDF").wait_for(state="visible")
+    pagina.locator("#ocr-ajuda", has_text="pode conter erros").wait_for(state="visible")
     _enviar(pagina)
     pagina.locator("#status-ocr").wait_for(state="hidden", timeout=PRAZO_CONVERSAO_MS)
     pagina.locator("#status-relato").wait_for(state="hidden", timeout=PRAZO_CONVERSAO_MS)
@@ -359,3 +359,78 @@ def test_troca_de_dominio_leva_ao_endereco_novo_e_desliga_o_service_worker(
     finally:
         antigo.shutdown()
         antigo.server_close()
+
+
+PAGINA_DIGITALIZADA = """<!doctype html><html><body style="margin:0;background:#fff">
+<div style="padding:90px 80px;font:22px/1.6 'Times New Roman',serif;color:#000">
+<p><b>1. ASSUNTO</b></p>
+<p>1.1. Proposta de padronizacao dos relatorios mensais das unidades regionais.</p>
+<p><b>2. CONCLUSAO</b></p>
+<p>2.1. Recomenda-se aprovar a proposta a partir do proximo trimestre.</p>
+</div></body></html>"""
+
+
+def _pdf_de_imagem(jpeg: bytes, largura: int, altura: int) -> bytes:
+    """PDF de uma página A4 que só tem uma imagem JPEG, como um documento digitalizado."""
+    conteudo = b"q 595 0 0 842 0 0 cm /Im0 Do Q"
+    objetos = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+        b"/Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB "
+        b"/BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n" % (largura, altura, len(jpeg))
+        + jpeg + b"\nendstream",
+        b"<< /Length %d >>\nstream\n" % len(conteudo) + conteudo + b"\nendstream",
+    ]
+    pdf = b"%PDF-1.4\n"
+    posicoes = []
+    for numero, corpo in enumerate(objetos, start=1):
+        posicoes.append(len(pdf))
+        pdf += b"%d 0 obj\n" % numero + corpo + b"\nendobj\n"
+    xref = len(pdf)
+    pdf += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objetos) + 1)
+    pdf += b"".join(b"%010d 00000 n \n" % p for p in posicoes)
+    pdf += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objetos) + 1, xref)
+    return pdf
+
+
+def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco: str) -> None:
+    """PDF sem camada de texto: o botão do erro reconhece as páginas no navegador, e o
+    texto segue a conversão do PDF, com o aviso para conferir. Mudar uma opção converte
+    de novo com o mesmo texto, sem pedir o OCR outra vez."""
+    pagina = contexto.new_page()  # type: ignore[attr-defined]
+    erros: list[str] = []
+    pagina.on("pageerror", lambda erro: erros.append(str(erro)))
+
+    # A "digitalização": o texto vira imagem, sem nenhuma fonte no PDF
+    pagina.set_viewport_size({"width": 794, "height": 1123})
+    pagina.set_content(PAGINA_DIGITALIZADA)
+    jpeg = pagina.screenshot(type="jpeg", quality=90)
+    pdf = _pdf_de_imagem(jpeg, 794, 1123)
+
+    pagina.goto(endereco)
+    _esperar_conversor(pagina)
+    pagina.set_input_files(
+        "#file-input", files=[{"name": "digitalizado.pdf", "mimeType": "application/pdf", "buffer": pdf}]
+    )
+    pagina.locator("#status-ocr-iniciar").wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
+    pagina.click("#status-ocr-iniciar")
+    pagina.locator("button.btn-copy").wait_for(state="visible", timeout=PRAZO_CARREGAMENTO_MS)
+
+    html = pagina.evaluate("() => currentResultFiles[0].conteudo")
+    assert 'class="Item_Nivel1"' in html
+    assert "ASSUNTO" in html and "CONCLUSAO" in html
+    assert "padronizacao dos relatorios mensais" in html
+    avisos = pagina.locator("#res-warnings-list").inner_text()
+    assert "reconhecido por OCR, que pode conter erros" in avisos and "outro motor" in avisos
+
+    # O campo fica no painel de opções, fechado: muda o valor como a pessoa faria ao sair dele
+    pagina.evaluate(
+        "() => { const c = document.getElementById('opt-max-kb'); c.value = '20';"
+        " c.dispatchEvent(new Event('change')); }"
+    )
+    pagina.locator("#toast-message", has_text="Convertido de novo").wait_for(timeout=PRAZO_CONVERSAO_MS)
+    assert "padronizacao dos relatorios mensais" in pagina.evaluate("() => currentResultFiles[0].conteudo")
+
+    assert erros == []

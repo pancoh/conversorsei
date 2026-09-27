@@ -239,7 +239,16 @@ def estruturar_texto_para_markdown(texto: str) -> str:
 
 def converter_pdf_para_blocos(pdf_path: FonteDocumento, max_nivel: int = 4) -> list[str]:
     """Extrai, limpa, estrutura e converte um arquivo PDF para blocos HTML SEI."""
-    texto_bruto = extrair_texto_pdf(pdf_path)
+    return converter_texto_de_pdf_para_blocos(extrair_texto_pdf(pdf_path), max_nivel=max_nivel)
+
+
+def converter_texto_de_pdf_para_blocos(texto_bruto: str, max_nivel: int = 4) -> list[str]:
+    """Converte o texto de um PDF, já extraído, para blocos HTML SEI.
+
+    Separado da extração porque o texto pode vir de fora: na web, o OCR do navegador
+    reconhece as páginas de um PDF digitalizado e entrega o texto aqui, para ele passar
+    pela mesma limpeza e estruturação do PDF com texto.
+    """
     texto_limpo = limpar_boilerplate_sei(texto_bruto)
     md_content = estruturar_texto_para_markdown(texto_limpo)
     return converter_texto_md_para_blocos(md_content, max_nivel=max_nivel, extraido=True)

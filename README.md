@@ -56,6 +56,7 @@ do SEI e você cola o resultado pronto no editor.
 | **Funciona sem internet** | Depois da primeira visita, a página abre mesmo desconectada. Também pode ser instalada como aplicativo. |
 | **Numeração automática** | Itens, subitens, incisos e alíneas usam a numeração do SEI, sem repetir o número digitado no documento. |
 | **Tabelas e imagens** | As tabelas saem centralizadas e com a largura do Word. As imagens vão junto com o texto. |
+| **PDF digitalizado** | O reconhecimento de texto (OCR) roda no navegador. O resultado pede conferência. |
 | **Documentos grandes** | Quando o texto passa do limite do SEI, o conversor divide em partes para você colar uma de cada vez. |
 | **Gratuito** | Sem cadastro, sem anúncios e sem limite de uso. |
 
@@ -68,8 +69,10 @@ do SEI e você cola o resultado pronto no editor.
 | `.pdf` | PDF com texto selecionável, inclusive os exportados pelo próprio SEI |
 | `.md` e `.txt` | Texto simples |
 
-PDF digitalizado (uma foto da página) não tem texto para ler. Nesse caso, passe o arquivo antes
-por um programa de OCR.
+PDF digitalizado (uma foto da página) não tem texto para ler. Nesse caso, a página oferece o
+botão **Reconhecer texto (OCR)**, que lê as páginas no próprio navegador, sem enviar o documento.
+O texto reconhecido pode conter erros, principalmente em nomes, números e acentos: confira com o
+original antes de salvar no SEI.
 
 <a id="uso"></a>
 

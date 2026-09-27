@@ -36,6 +36,7 @@ def converter_documento_memoria(
     validar: bool = True,
     citacao_por_recuo: bool = False,
     omitir_cabecalho: bool = False,
+    texto_reconhecido: str | None = None,
 ) -> dict[str, Any]:
     """Converte bytes de um arquivo em memória e retorna um dicionário com os arquivos gerados."""
     resultado = converter_bytes(
@@ -49,6 +50,7 @@ def converter_documento_memoria(
         validar=validar,
         citacao_por_recuo=citacao_por_recuo,
         omitir_cabecalho=omitir_cabecalho,
+        texto_reconhecido=texto_reconhecido,
     )
 
     arquivos = [
@@ -96,6 +98,7 @@ def converter_memoria_json(
     validar: bool = True,
     citacao_por_recuo: bool = False,
     omitir_cabecalho: bool = False,
+    texto_reconhecido: str | None = None,
 ) -> str:
     """Converte bytes em memória e retorna uma string JSON (fácil de consumir no JS)."""
     res = converter_documento_memoria(
@@ -109,5 +112,6 @@ def converter_memoria_json(
         validar=validar,
         citacao_por_recuo=citacao_por_recuo,
         omitir_cabecalho=omitir_cabecalho,
+        texto_reconhecido=texto_reconhecido,
     )
     return json.dumps(res, ensure_ascii=False)

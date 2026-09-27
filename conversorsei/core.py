@@ -27,7 +27,7 @@ from conversorsei.particionador import (
     montar_html,
     orcamento_corpo,
 )
-from conversorsei.pdf_converter import converter_pdf_para_blocos
+from conversorsei.pdf_converter import converter_pdf_para_blocos, converter_texto_de_pdf_para_blocos
 from conversorsei.validador import validar_html_sei
 
 EXTENSOES_SUPORTADAS = {".docx", ".pdf", ".md", ".txt", ".odt"}
@@ -42,6 +42,14 @@ FORMATOS_RETIRADOS = {
 # propósito: viram um resultado com erro e a orientação acima, em vez de serem puladas
 # em silêncio (um .rtf ou .doc deixado na pasta de entrada simplesmente sumiria da conversão).
 EXTENSOES_RECONHECIDAS = frozenset(EXTENSOES_SUPORTADAS | FORMATOS_RETIRADOS.keys())
+# O OCR erra letras e números sem aviso: o resultado precisa de conferência. Para muitos
+# erros, o caminho é outro motor de OCR ou o original, porque o OCRmyPDF, com o mesmo
+# Tesseract, dá o mesmo resultado
+AVISO_OCR = (
+    "Texto reconhecido por OCR, que pode conter erros: confira nomes, números, datas e valores com o "
+    "original antes de salvar no SEI. Se houver muitos erros, peça o documento original em Word (.docx) "
+    "ou use um programa de OCR com outro motor, como o Adobe Acrobat ou o ABBYY FineReader."
+)
 
 
 @dataclass
@@ -354,6 +362,7 @@ def converter_bytes(
     validar: bool = True,
     citacao_por_recuo: bool = False,
     omitir_cabecalho: bool = False,
+    texto_reconhecido: str | None = None,
 ) -> ResultadoMemoria:
     """Converte o conteúdo de um documento sem tocar no disco.
 
@@ -361,6 +370,10 @@ def converter_bytes(
     conversão inteira acontece em memória. Gravar entrada e saída em arquivos
     temporários só para relê-los custa caro no sistema de arquivos emulado do
     WebAssembly, onde a página roda.
+
+    `texto_reconhecido` é o texto que o OCR do navegador leu de um PDF digitalizado.
+    Com ele, o PDF não é lido de novo (não teria o que extrair): o texto segue a
+    limpeza e a estruturação do PDF com texto, e o resultado leva o aviso do OCR.
     """
     origem = Path(nome_arquivo)
     resultado = ResultadoMemoria(nome_origem=origem.name)
@@ -371,10 +384,18 @@ def converter_bytes(
         # O stream leva o nome junto para que os leitores citem o arquivo que o usuário
         # enviou, e não um nome genérico, nas mensagens de erro. Fecha assim que os
         # blocos saem, para devolver a memória do navegador sem esperar o coletor
-        with closing(StreamNomeado(conteudo, origem.name)) as fonte:
-            blocos = extrair_blocos_de_fonte(
-                fonte, origem.suffix, max_nivel=max_nivel, citacao=citacao, avisos=avisos_extracao
-            )
+        if texto_reconhecido is not None:
+            if not texto_reconhecido.strip():
+                raise RuntimeError(
+                    "o OCR não reconheceu texto nas páginas. Confira se a digitalização está legível."
+                )
+            blocos = converter_texto_de_pdf_para_blocos(texto_reconhecido, max_nivel=max_nivel)
+            avisos_extracao.append(AVISO_OCR)
+        else:
+            with closing(StreamNomeado(conteudo, origem.name)) as fonte:
+                blocos = extrair_blocos_de_fonte(
+                    fonte, origem.suffix, max_nivel=max_nivel, citacao=citacao, avisos=avisos_extracao
+                )
     except Exception as e:
         resultado.sucesso = False
         resultado.erros.append(mensagem_erro_de_extracao(origem.name, e))

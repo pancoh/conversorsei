@@ -416,3 +416,27 @@ def test_cabecalho_vale_para_paragrafos_numerados():
     cabecalho, corpo = separar_cabecalho(blocos)
     assert cabecalho == blocos[:1]
     assert corpo == blocos[1:]
+
+
+def test_texto_do_ocr_segue_o_caminho_do_pdf_e_avisa_para_conferir():
+    """O OCR do navegador entrega o texto de um PDF digitalizado. Ele passa pela mesma
+    estruturação do PDF com texto, e o resultado pede conferência, porque o OCR erra
+    letras e números sem avisar."""
+    texto = "1. ASSUNTO\n\n1.1. Texto reconhecido da página digitalizada.\n\n2. CONCLUSÃO\n\n2.1. Fim."
+    res = converter_documento_memoria(
+        nome_arquivo="protocolo.pdf", conteudo_bytes=b"%PDF sem texto", texto_reconhecido=texto
+    )
+    assert res["sucesso"] is True
+    conteudo = res["arquivos"][0]["conteudo"]
+    assert "Item_Nivel1" in conteudo and "ASSUNTO" in conteudo
+    assert "Texto reconhecido da página digitalizada." in conteudo
+    assert any("reconhecido por OCR" in aviso for aviso in res["avisos"])
+
+
+def test_ocr_sem_texto_reconhecido_explica_o_erro():
+    res = converter_documento_memoria(
+        nome_arquivo="protocolo.pdf", conteudo_bytes=b"%PDF sem texto", texto_reconhecido="  \n "
+    )
+    assert res["sucesso"] is False
+    assert "o OCR não reconheceu texto" in res["erros"][0]
+    assert "protocolo.pdf" in res["erros"][0]
