@@ -1,45 +1,103 @@
-# Conversor SEI
+<p align="center">
+  <a href="https://ramson.com.br/conversorsei/">
+    <img src="docs/icons/marca-conversor.svg" width="112" height="112" alt="Logo do Conversor SEI">
+  </a>
+</p>
 
-Converte documentos `.docx`, `.odt`, `.pdf`, `.md` e `.txt` em HTML com os estilos do editor do
-**SEI**. O texto colado no SEI mantém a numeração automática, as tabelas, as imagens e as
-classes de parágrafo do padrão institucional.
+<h1 align="center">Conversor SEI</h1>
 
-**Use pelo navegador: [ramson.com.br/conversorsei](https://ramson.com.br/conversorsei/)**
+<p align="center">
+  Transforma documentos do Word, do LibreOffice e em PDF em texto pronto para colar no editor do <strong>SEI</strong>,<br>
+  com a formatação e a numeração do padrão institucional.
+</p>
 
-- Não precisa instalar nada.
-- O documento não sai do seu computador: a conversão roda no próprio navegador.
-- Depois da primeira visita, a página funciona sem internet e pode ser instalada como aplicativo.
+<p align="center">
+  <a href="https://ramson.com.br/conversorsei/"><strong>Abrir o conversor</strong></a>
+  &nbsp;·&nbsp;
+  <a href="#como-usar">Como usar</a>
+  &nbsp;·&nbsp;
+  <a href="#perguntas-frequentes">Perguntas frequentes</a>
+</p>
 
-Confira sempre o resultado antes de salvar no SEI, principalmente imagens e tabelas.
+<p align="center">
+  <a href="https://github.com/pancoh/conversorsei/actions/workflows/deploy-pages.yml"><img src="https://github.com/pancoh/conversorsei/actions/workflows/deploy-pages.yml/badge.svg" alt="Verificações"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licen%C3%A7a-MIT-123B53" alt="Licença MIT"></a>
+  <img src="https://img.shields.io/badge/gratuito-sem%20cadastro-91BB25" alt="Gratuito e sem cadastro">
+</p>
 
-## O que o conversor faz
+---
 
-- Aplica as classes de parágrafo do SEI, inclusive a numeração automática de itens, incisos e
-  alíneas, sem repetir o número digitado no documento.
-- Centraliza as tabelas e mantém a largura que elas têm no Word.
-- Incorpora as imagens do Word no próprio HTML.
-- Divide documentos grandes em partes, para evitar o defeito do SEI Pro que desfaz os estilos
-  acima de 27 KB.
-- Limpa os PDFs exportados pelo SEI (carimbos, assinaturas e rodapés). O PDF precisa ter texto
-  selecionável; documento só digitalizado exige OCR antes.
-- A pedido, omite o cabeçalho (título, número, processo), que o SEI já gera pelo modelo.
-- Lista o que precisa de conferência manual, como notas de rodapé e imagens do `.odt`.
+## Para que serve
 
-Para escolher uma classe específica, use no Word ou no LibreOffice um estilo com o nome exato
-da classe do SEI (por exemplo, `Texto_Ementa` ou `Citação`).
+Quem cola um texto do Word no SEI costuma perder a formatação: a numeração se desfaz, as
+tabelas ficam tortas e os parágrafos saem fora do padrão. Depois, é preciso ajustar tudo à mão.
 
-## Como colar no SEI
+O Conversor SEI faz esse ajuste por você. Você envia o documento, o conversor aplica os estilos
+do SEI e você cola o resultado pronto no editor.
 
-1. Converta o documento e clique em **Copiar para o SEI** (na linha de comando, abra o arquivo
-   `*_SEI.html` no navegador e copie tudo com `Ctrl+A` e `Ctrl+C`).
-2. No editor do SEI, clique no corpo do documento e cole com `Ctrl+V`.
-3. Confira a numeração e as tabelas e salve.
+> **Não precisa instalar nada.** Basta abrir
+> [ramson.com.br/conversorsei](https://ramson.com.br/conversorsei/) no navegador.
 
-Se o documento foi dividido em partes, cole uma de cada vez, na ordem.
+## Por que usar
+
+| Vantagem | Como funciona |
+|---|---|
+| **Seu documento não sai do computador** | A conversão acontece dentro do próprio navegador. Nenhum arquivo é enviado para a internet. |
+| **Funciona sem internet** | Depois da primeira visita, a página abre mesmo desconectada. Também pode ser instalada como aplicativo. |
+| **Numeração automática** | Itens, subitens, incisos e alíneas usam a numeração do SEI, sem repetir o número digitado no documento. |
+| **Tabelas e imagens** | As tabelas saem centralizadas e com a largura do Word. As imagens vão junto com o texto. |
+| **Documentos grandes** | Quando o texto passa do limite do SEI, o conversor divide em partes para você colar uma de cada vez. |
+| **Gratuito** | Sem cadastro, sem anúncios e sem limite de uso. |
+
+## Formatos aceitos
+
+| Formato | Origem comum |
+|---|---|
+| `.docx` | Microsoft Word |
+| `.odt` | LibreOffice Writer |
+| `.pdf` | PDF com texto selecionável, inclusive os exportados pelo próprio SEI |
+| `.md` e `.txt` | Texto simples |
+
+PDF digitalizado (uma foto da página) não tem texto para ler. Nesse caso, passe o arquivo antes
+por um programa de OCR.
+
+## Como usar
+
+1. Abra [ramson.com.br/conversorsei](https://ramson.com.br/conversorsei/).
+2. Arraste o documento para a página ou clique para escolher o arquivo.
+3. Clique em **Copiar para o SEI**.
+4. No SEI, abra o editor, clique no corpo do documento e cole com `Ctrl+V` (no Mac, `Cmd+V`).
+5. Confira o resultado, principalmente a numeração, as tabelas e as imagens, e salve.
+
+Se o documento foi dividido em partes, copie e cole uma parte de cada vez, na ordem indicada.
+
+## Perguntas frequentes
+
+**O conversor guarda ou lê meu documento?**
+Não. O arquivo é processado no seu navegador e não é enviado a nenhum servidor.
+
+**O cabeçalho do documento saiu repetido no SEI. O que faço?**
+O SEI já gera o título, o número e o processo pelo modelo. Na página, abra
+**Revisar ajustes do documento** e clique em **Omitir cabeçalho**.
+
+**Um parágrafo não ficou com o estilo que eu queria.**
+No Word ou no LibreOffice, aplique ao parágrafo um estilo com o nome exato da classe do SEI
+(por exemplo, `Texto_Ementa` ou `Citação`). O conversor respeita esse nome.
+
+**O conversor avisou que algo precisa de conferência. É um erro?**
+Não. O aviso aponta o que ele não consegue garantir sozinho, como notas de rodapé. A conversão
+foi feita; só confira esses pontos antes de salvar.
+
+**Encontrei um problema. Como aviso?**
+Use o link **Relatar problema** da página. Ele abre um e-mail já preenchido com a versão e o
+navegador. O nome e o conteúdo do documento não vão no e-mail.
+
+---
 
 ## Linha de comando
 
-Requer Python 3.11 ou mais recente.
+Para converter muitos arquivos de uma vez, o conversor também roda no terminal. Requer Python
+3.11 ou mais recente.
 
 ```bash
 uv sync                                   # ou: pip install -e .
@@ -51,6 +109,9 @@ conversorsei -w                           # converte a cada arquivo salvo em dad
 conversorsei --help                       # todas as opções
 ```
 
+O resultado é um arquivo `*_SEI.html`. Abra no navegador, copie tudo (`Ctrl+A` e `Ctrl+C`) e
+cole no SEI.
+
 Para testar, use o documento de exemplo:
 
 ```bash
@@ -60,7 +121,10 @@ conversorsei exemplos/nota_tecnica_exemplo.md -o dados/saida/
 Na linha de comando, o PDF pode sair melhor que na web: quando o `pdftotext` está instalado, ele
 é usado no lugar do `pypdf`.
 
-## Para quem desenvolve
+<details>
+<summary><strong>Para quem desenvolve</strong></summary>
+
+<br>
 
 ```bash
 uv run pytest -q                          # testes
@@ -81,14 +145,17 @@ A página publicada fica em `docs/` e roda o mesmo pacote Python no navegador, p
 
 O GitHub Actions roda todas as verificações e só publica a página se elas passarem.
 
-## Privacidade, problemas e apoio
+</details>
 
-- A página conta visitas e conversões pelo GoatCounter, sem cookies. De cada conversão vão só a
-  extensão do arquivo e o resultado, nunca o nome ou o conteúdo do documento.
-- Para relatar um problema, use o link **Relatar problema** da página. Ele abre um e-mail com a
-  versão e o navegador preenchidos, sem o documento e sem o nome do arquivo.
-- O conversor é gratuito. Para apoiar o projeto, use o link **Apoie este projeto**, no rodapé
-  da página (Pix).
+## Privacidade
+
+A página conta visitas e conversões pelo GoatCounter, sem cookies. De cada conversão vão só a
+extensão do arquivo e o resultado, nunca o nome ou o conteúdo do documento.
+
+## Apoie o projeto
+
+O Conversor SEI é gratuito. Se ele ajuda no seu trabalho, você pode apoiar pelo link
+**Apoie este projeto**, no rodapé da página (Pix).
 
 ## Licença
 
