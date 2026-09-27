@@ -175,3 +175,7 @@ O Conversor SEI é gratuito. Se ele ajuda no seu trabalho, você pode apoiar pel
 ## <img src=".github/readme/licenca.svg" width="24" height="24" alt=""> Licença
 
 MIT. Veja [LICENSE](LICENSE).
+
+---
+
+<sub>O Conversor SEI é um projeto independente e não oficial, sem vínculo com os órgãos responsáveis pelo SEI.</sub>
