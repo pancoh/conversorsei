@@ -186,6 +186,12 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     assert "Conversão concluída" in relato
     assert "nota" not in relato.lower()
 
+    # A sugestão vai para o mesmo e-mail, com assunto próprio e sem os dados técnicos
+    sugestao = unquote(pagina.get_attribute("[data-sugestao]", "href"))
+    assert sugestao.startswith("mailto:conversorsei@gmail.com?subject=Conversor SEI: sugestão")
+    assert "Versão da página:" not in sugestao and "Navegador:" not in sugestao
+    assert "nota" not in sugestao.lower()
+
     # Apoio por Pix: a janela mostra o QR Code e copia o mesmo código do QR Code
     pagina.click("#btn-apoio")
     pagina.locator("#pix-modal").wait_for(state="visible")

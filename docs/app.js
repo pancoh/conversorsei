@@ -221,6 +221,24 @@ document.querySelectorAll('[data-relato]').forEach(link => {
   link.addEventListener('click', () => { link.href = linkDoRelato(); });
 });
 
+// A sugestão vai para o mesmo e-mail, com assunto próprio e sem dados técnicos: ela não
+// depende de uma conversão, e a versão e o navegador só atrapalhariam a leitura
+function linkDaSugestao() {
+  const corpo = [
+    'Sua sugestão:',
+    '',
+    '',
+    'Em que situação ela ajudaria:',
+    '',
+    '',
+    'Não anexe documento com informação restrita.',
+  ].join('\n');
+  const assunto = encodeURIComponent('Conversor SEI: sugestão');
+  return `mailto:${EMAIL_RELATO}?subject=${assunto}&body=${encodeURIComponent(corpo)}`;
+}
+
+document.querySelectorAll('[data-sugestao]').forEach(link => { link.href = linkDaSugestao(); });
+
 // Janela do Pix: abre pelo rodapé, fecha no X, no Esc ou no fundo, e devolve o foco ao botão
 const pixModal = document.getElementById('pix-modal');
 const btnApoio = document.getElementById('btn-apoio');
