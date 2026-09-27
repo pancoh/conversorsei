@@ -1,4 +1,4 @@
-// app.js — Controlador da aplicação Web conversao-sei no Pyodide
+// app.js: controlador da aplicação web do Conversor SEI no Pyodide
 
 let pyodideInstance = null;
 let isPyodideReady = false;

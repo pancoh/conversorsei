@@ -167,17 +167,17 @@ def observar(args: argparse.Namespace, alvos: list[str], outdir: Path | None, va
 
 def criar_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="conversao-sei",
+        prog="conversorsei",
         description="Converte arquivos DOCX, PDF, ODT, MD e TXT em HTML no padrão institucional do editor SEI.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemplos de uso:
-  conversao-sei documento.docx
-  conversao-sei minuta.md -o ./saida_sei/
-  conversao-sei processo.pdf --max-kb=18
-  conversao-sei ./pasta_de_documentos/ -r -o ./saida/
-  conversao-sei doc.docx --corpo  # para o plugin 'inserir HTML' do SEI Pro
-  conversao-sei -w                # observa dados/entrada/ e converte a cada alteração
+  conversorsei documento.docx
+  conversorsei minuta.md -o ./saida_sei/
+  conversorsei processo.pdf --max-kb=18
+  conversorsei ./pasta_de_documentos/ -r -o ./saida/
+  conversorsei doc.docx --corpo  # para o plugin 'inserir HTML' do SEI Pro
+  conversorsei -w                # observa dados/entrada/ e converte a cada alteração
 """,
     )
 

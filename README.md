@@ -44,17 +44,17 @@ Requer Python 3.11 ou mais recente.
 ```bash
 uv sync                                   # ou: pip install -e .
 
-conversao-sei documento.docx              # converte um arquivo
-conversao-sei pasta/ -o saida/ -r         # converte uma pasta e as subpastas
-conversao-sei                             # converte dados/entrada/ para dados/saida/
-conversao-sei -w                          # converte a cada arquivo salvo em dados/entrada/
-conversao-sei --help                      # todas as opções
+conversorsei documento.docx               # converte um arquivo
+conversorsei pasta/ -o saida/ -r          # converte uma pasta e as subpastas
+conversorsei                              # converte dados/entrada/ para dados/saida/
+conversorsei -w                           # converte a cada arquivo salvo em dados/entrada/
+conversorsei --help                       # todas as opções
 ```
 
 Para testar, use o documento de exemplo:
 
 ```bash
-conversao-sei exemplos/nota_tecnica_exemplo.md -o dados/saida/
+conversorsei exemplos/nota_tecnica_exemplo.md -o dados/saida/
 ```
 
 Na linha de comando, o PDF pode sair melhor que na web: quando o `pdftotext` está instalado, ele

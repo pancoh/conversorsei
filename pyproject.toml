@@ -1,5 +1,5 @@
 [project]
-name = "conversao-sei"
+name = "conversorsei"
 version = "0.2.0"
 description = "Conversor universal de documentos (DOCX, PDF, MD) para o padrão do editor SEI"
 readme = "README.md"
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-conversao-sei = "conversao_sei.cli:main"
+conversorsei = "conversao_sei.cli:main"
 
 [dependency-groups]
 dev = [

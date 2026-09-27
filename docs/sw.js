@@ -1,4 +1,4 @@
-// sw.js — Service worker da conversao-sei.
+// sw.js: service worker do Conversor SEI.
 //
 // Objetivo: depois da primeira visita, a página abre e converte documentos sem rede.
 // O que é servido pelo próprio site entra no cache já na instalação. O que vem de fora
