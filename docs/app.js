@@ -726,10 +726,12 @@ function mostrarStatusErro(titulo, descricao) {
 // baixado quando alguém pede o reconhecimento: são cerca de 7 MB, e a maioria dos
 // documentos não precisa deles. O documento não sai do navegador
 const OCR = {
-  pdfjs: 'vendor/pdfjs-6.3.289/pdf.min.js',
-  pdfjsWorker: 'vendor/pdfjs-6.3.289/pdf.worker.min.js',
+  // A versão legacy do PDF.js traz os recursos novos de JavaScript que ele usa
+  // (Map.getOrInsertComputed): sem eles, o OCR falhava no Samsung Internet do Android
+  pdfjs: 'vendor/pdfjs-legacy-6.3.289/pdf.min.js',
+  pdfjsWorker: 'vendor/pdfjs-legacy-6.3.289/pdf.worker.min.js',
   // Decodificadores de imagem (JBIG2 e JPEG 2000), comuns em documento digitalizado
-  pdfjsWasm: 'vendor/pdfjs-6.3.289/wasm/',
+  pdfjsWasm: 'vendor/pdfjs-legacy-6.3.289/wasm/',
   tesseract: 'vendor/tesseract-7.0.0/tesseract.min.js',
   tesseractWorker: 'vendor/tesseract-7.0.0/worker.min.js',
   // O Tesseract escolhe a variante do motor que o navegador suporta (com ou sem SIMD)

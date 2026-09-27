@@ -400,6 +400,13 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     pagina.on("pageerror", lambda erro: erros.append(str(erro)))
     console: list[str] = []
     pagina.on("console", lambda msg: console.append(f"{msg.type}: {msg.text}"))
+    # Simula um navegador sem os recursos mais novos de Map e WeakMap, como o Samsung
+    # Internet do Android: o PDF.js comum falhava ali, e o Playwright usa navegadores de
+    # última versão, que os têm
+    pagina.add_init_script(
+        "for (const tipo of [Map, WeakMap])"
+        " for (const nome of ['getOrInsert', 'getOrInsertComputed']) delete tipo.prototype[nome];"
+    )
 
     # A "digitalização": o texto vira imagem, sem nenhuma fonte no PDF
     pagina.set_viewport_size({"width": 794, "height": 1123})
