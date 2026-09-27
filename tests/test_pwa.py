@@ -123,7 +123,7 @@ def test_contador_de_acessos_fica_fora_do_cache_e_nao_recebe_o_nome_do_arquivo()
     (sem rede, a visita só deixa de ser contada) e o evento de conversão leva a extensão,
     nunca o nome do arquivo, que pode identificar o processo."""
     index = INDEX.read_text(encoding="utf-8")
-    assert 'data-goatcounter="https://ramson.goatcounter.com/count"' in index
+    assert 'data-goatcounter="https://conversorsei.goatcounter.com/count"' in index
     assert 'src="https://gc.zgo.at/count.js"' in index
 
     sw = SW.read_text(encoding="utf-8")
