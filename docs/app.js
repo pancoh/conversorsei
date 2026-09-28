@@ -1176,7 +1176,7 @@ function renderResults(result) {
   // Avisos de validação
   if (result.avisos && result.avisos.length > 0) {
     resWarningsCard.classList.remove('hidden');
-    resWarningsList.innerHTML = result.avisos.map(a => `<li>${comLinks(a)}</li>`).join('');
+    resWarningsList.innerHTML = result.avisos.map(a => `<li>${formatarAviso(a)}</li>`).join('');
   } else {
     resWarningsCard.classList.add('hidden');
     resWarningsList.innerHTML = '';
@@ -1466,12 +1466,19 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Endereço https de um aviso vira link, depois de o texto ser escapado. O aviso do OCR
-// indica um serviço online, e a pessoa teria de copiar o endereço à mão. A pontuação que
+// Marcas do aviso, aplicadas depois de o texto ser escapado: `[texto](https://...)` e
+// endereço https solto viram link, e `**...**`, negrito. O aviso do OCR indica um serviço
+// online, e a pessoa teria de copiar o endereço à mão. No endereço solto, a pontuação que
 // fecha a frase fica fora do link
-function comLinks(texto) {
-  return escapeHtml(texto).replace(/https:\/\/[^\s<]*[^\s<.,;:)]/g, (url) =>
-    `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-semibold underline">${url}</a>`);
+function formatarAviso(texto) {
+  const link = (url, rotulo) =>
+    `<a href="${url}" target="_blank" rel="noopener noreferrer" class="font-semibold underline">${rotulo}</a>`;
+  // Uma expressão só para as duas formas de link: em duas passadas, a segunda acharia o
+  // endereço dentro do href que a primeira acabou de gerar
+  return escapeHtml(texto)
+    .replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)|https:\/\/[^\s<]*[^\s<.,;:)]/g,
+      (trecho, rotulo, url) => (url ? link(url, rotulo) : link(trecho, trecho)))
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 }
 
 function escapeHtml(text) {

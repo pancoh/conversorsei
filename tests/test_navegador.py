@@ -468,8 +468,12 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     assert "ASSUNTO" in html and "CONCLUSAO" in html
     assert "padronizacao dos relatorios mensais" in html
     avisos = pagina.locator("#res-warnings-list").inner_text()
-    assert "reconhecido por OCR, que pode conter erros" in avisos and "PDF24" in avisos
+    assert "reconhecido por OCR e pode ter erros" in avisos and "Muitos erros?" in avisos
+    # As marcas do aviso viram negrito e link, sem sobrar asterisco ou colchete na tela
+    assert "**" not in avisos and "](" not in avisos
+    assert pagina.locator("#res-warnings-list strong", has_text="Muitos erros?").count() == 1
     link = pagina.locator("#res-warnings-list a")
+    assert link.inner_text() == "PDF24"
     assert link.get_attribute("href") == "https://tools.pdf24.org/pt/ocr-pdf"
     assert link.get_attribute("rel") == "noopener noreferrer"
 

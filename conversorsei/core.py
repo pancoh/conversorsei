@@ -44,12 +44,15 @@ FORMATOS_RETIRADOS = {
 EXTENSOES_RECONHECIDAS = frozenset(EXTENSOES_SUPORTADAS | FORMATOS_RETIRADOS.keys())
 # O OCR erra letras e números sem aviso: o resultado precisa de conferência. Para muitos
 # erros, o caminho é o original ou outro programa de OCR (o OCRmyPDF ficou de fora: usa o
-# mesmo Tesseract e deu o mesmo resultado). O endereço vira link na página
-AVISO_OCR = (
-    "Texto reconhecido por OCR, que pode conter erros: confira nomes, números, datas e valores com o "
-    "original antes de salvar no SEI. Se houver muitos erros, peça o documento original em Word (.docx) "
-    "ou use outro programa de OCR: o PDF24 (https://tools.pdf24.org/pt/ocr-pdf), online, que envia o "
-    "documento aos servidores do serviço, ou o Adobe Acrobat e o ABBYY FineReader, instalados no computador."
+# mesmo Tesseract e deu o mesmo resultado). São dois avisos, um por assunto: num só, o
+# que conferir ficava perdido no meio das alternativas. A página mostra `**...**` em
+# negrito e `[texto](endereço)` como link; no relato por e-mail, o texto vai como está
+AVISOS_OCR = (
+    "**O texto foi reconhecido por OCR e pode ter erros.** Confira nomes, números, datas e valores "
+    "com o original antes de salvar no SEI.",
+    "**Muitos erros?** Peça o documento original em Word (.docx) ou use outro programa de OCR: "
+    "[PDF24](https://tools.pdf24.org/pt/ocr-pdf) (online; o documento vai para o servidor do serviço), "
+    "Adobe Acrobat ou ABBYY FineReader (instalados no computador).",
 )
 
 
@@ -391,7 +394,7 @@ def converter_bytes(
                     "o OCR não reconheceu texto nas páginas. Confira se a digitalização está legível."
                 )
             blocos = converter_texto_de_pdf_para_blocos(texto_reconhecido, max_nivel=max_nivel)
-            avisos_extracao.append(AVISO_OCR)
+            avisos_extracao.extend(AVISOS_OCR)
         else:
             with closing(StreamNomeado(conteudo, origem.name)) as fonte:
                 blocos = extrair_blocos_de_fonte(

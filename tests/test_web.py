@@ -430,9 +430,10 @@ def test_texto_do_ocr_segue_o_caminho_do_pdf_e_avisa_para_conferir():
     conteudo = res["arquivos"][0]["conteudo"]
     assert "Item_Nivel1" in conteudo and "ASSUNTO" in conteudo
     assert "Texto reconhecido da página digitalizada." in conteudo
-    aviso = next(a for a in res["avisos"] if "reconhecido por OCR" in a)
+    assert any("reconhecido por OCR e pode ter erros" in a for a in res["avisos"])
+    alternativas = next(a for a in res["avisos"] if "Muitos erros?" in a)
     # O PDF24 é online: o aviso diz que o documento sai do computador
-    assert "PDF24" in aviso and "envia o documento aos servidores" in aviso
+    assert "[PDF24](https://" in alternativas and "o documento vai para o servidor" in alternativas
 
 
 def test_ocr_sem_texto_reconhecido_explica_o_erro():
