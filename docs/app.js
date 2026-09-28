@@ -29,6 +29,11 @@ const statusTitle = document.getElementById('status-title');
 const statusDesc = document.getElementById('status-desc');
 const statusRelato = document.getElementById('status-relato');
 const statusOcrIniciar = document.getElementById('status-ocr-iniciar');
+const statusProgresso = document.getElementById('status-progresso');
+const statusProgressoTrilho = document.getElementById('status-progresso-trilho');
+const statusProgressoBarra = document.getElementById('status-progresso-barra');
+const statusProgressoEtapa = document.getElementById('status-progresso-etapa');
+const statusProgressoPorcento = document.getElementById('status-progresso-porcento');
 
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
@@ -676,6 +681,7 @@ function reativarResultado() {
 function mostrarStatusProcessando(titulo) {
   statusRelato.classList.add('hidden');
   statusOcrIniciar.classList.add('hidden');
+  statusProgresso.classList.add('hidden');
   pyodideStatusCard.className = 'bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
   statusSpinner.className = 'animate-spin text-blue-600';
   statusSpinner.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5"></i>';
@@ -692,6 +698,7 @@ function mostrarStatusProcessando(titulo) {
 function mostrarStatusDiscreto(texto) {
   statusRelato.classList.add('hidden');
   statusOcrIniciar.classList.add('hidden');
+  statusProgresso.classList.add('hidden');
   pyodideStatusCard.className = 'flex items-center px-1';
   statusSpinner.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-emerald-700"></i>';
   statusSpinner.className = '';
@@ -708,6 +715,7 @@ const MARCA_PDF_SEM_TEXTO = 'não tem camada de texto';
 function mostrarStatusErro(titulo, descricao) {
   registrarParaRelato(titulo, [descricao]);
   statusRelato.classList.remove('hidden');
+  statusProgresso.classList.add('hidden');
   const semTexto = String(descricao || '').includes(MARCA_PDF_SEM_TEXTO);
   // O reconhecimento é de um documento por vez: no lote, a falha fica na lista
   statusOcrIniciar.classList.toggle('hidden', !(semTexto && ultimosArquivos.length === 1));
@@ -718,6 +726,38 @@ function mostrarStatusErro(titulo, descricao) {
   statusTitle.textContent = titulo;
   statusDesc.className = 'text-sm text-rose-700';
   statusDesc.textContent = descricao || 'Verifique o formato do documento.';
+  refreshIcons();
+}
+
+// Andamento do OCR: a barra mede o documento inteiro, e não a página, para não voltar
+// ao zero a cada página. Antes das páginas (download e preparo do motor), a barra some e
+// só a etapa aparece, porque a porcentagem ali é da etapa. O aviso vai em letra menor,
+// abaixo: antes, etapa, porcentagem e aviso vinham emendados na mesma frase
+function mostrarAndamentoOcr({ etapa, pagina, total, fracao }) {
+  statusProgresso.classList.remove('hidden');
+  statusProgressoTrilho.classList.toggle('hidden', !pagina);
+  // Com três linhas, o ícone fica na altura do título, e não no meio do quadro
+  statusSpinner.className = 'animate-spin text-blue-600 self-start mt-px';
+  let porcento = null;
+  if (pagina) {
+    statusTitle.textContent = 'Reconhecendo o texto';
+    statusProgressoEtapa.textContent = `Página ${pagina} de ${total}`;
+    porcento = Math.round(((pagina - 1 + (fracao || 0)) / total) * 100);
+  } else {
+    statusTitle.textContent = 'Preparando o reconhecimento de texto';
+    statusProgressoEtapa.textContent = etapa;
+    if (typeof fracao === 'number') porcento = Math.round(fracao * 100);
+  }
+  statusProgressoPorcento.textContent = porcento === null ? '' : `${porcento}%`;
+  if (pagina) statusProgressoBarra.style.width = `${porcento}%`;
+  const aviso = 'O documento não sai do computador. O texto reconhecido pode conter erros.'
+    + (pagina ? '' : ' Na primeira vez, a página baixa cerca de 7 MB.');
+  // O Tesseract informa o andamento dezenas de vezes por página: o aviso e o ícone só
+  // são refeitos quando o texto muda
+  if (statusDesc.lastElementChild?.textContent === aviso) return;
+  statusDesc.className = 'flex items-start gap-1.5 text-xs text-blue-700/80';
+  statusDesc.innerHTML = '<i data-lucide="lock" class="w-3.5 h-3.5 mt-px shrink-0"></i><span></span>';
+  statusDesc.lastElementChild.textContent = aviso;
   refreshIcons();
 }
 
@@ -776,10 +816,10 @@ const ETAPAS_DO_TESSERACT = {
   'recognizing text': 'Reconhecendo',
 };
 
-// `informar(titulo, detalhe)` recebe cada etapa: o título diz a etapa, e o detalhe, o
-// andamento dentro dela
+// `informar({ etapa, pagina, total, fracao })` recebe cada passo: antes das páginas, a
+// etapa e o andamento dela; depois, a página e o andamento dentro dela
 async function reconhecerTextoDoPdf(file, informar) {
-  informar('Carregando o OCR...');
+  informar({ etapa: 'Carregando o OCR' });
   // O Tesseract baixa junto com o PDF.js: numa rede de celular, em sequência a espera
   // seria a soma das duas. Só o PDF.js precisa esperar os recursos que completam o navegador
   const [pdfjs] = await Promise.all([
@@ -807,7 +847,7 @@ async function reconhecerTextoDoPdf(file, informar) {
   let carregamento = null;
   try {
     leitor = pdfjs.PDFWorker.create({ port: workerDoPdf });
-    informar('Abrindo o PDF...');
+    informar({ etapa: 'Abrindo o PDF' });
     carregamento = pdfjs.getDocument({
       worker: leitor,
       data: new Uint8Array(await file.arrayBuffer()),
@@ -835,8 +875,8 @@ async function reconhecerTextoDoPdf(file, informar) {
 }
 
 async function reconhecerPaginas(pdf, comOWorker, informar) {
-  let tituloDaPagina = 'Preparando o motor de OCR...';
-  informar(tituloDaPagina);
+  let paginaAtual = 0;
+  informar({ etapa: 'Preparando o motor de OCR' });
   // O worker vem do próprio site, e não de um blob: assim o service worker o controla e
   // guarda o motor e o modelo para uso sem rede. O cache do Tesseract (IndexedDB) seria
   // uma segunda cópia do modelo
@@ -847,16 +887,19 @@ async function reconhecerPaginas(pdf, comOWorker, informar) {
     workerBlobURL: false,
     cacheMethod: 'none',
     logger: (m) => {
-      const etapa = ETAPAS_DO_TESSERACT[m.status] || m.status;
-      const porcento = typeof m.progress === 'number' ? ` (${Math.round(m.progress * 100)}%)` : '';
-      informar(tituloDaPagina, `${etapa}${porcento}`);
+      const fracao = typeof m.progress === 'number' ? m.progress : undefined;
+      if (paginaAtual) {
+        if (m.status === 'recognizing text') informar({ pagina: paginaAtual, total: pdf.numPages, fracao });
+      } else {
+        informar({ etapa: ETAPAS_DO_TESSERACT[m.status] || m.status, fracao });
+      }
     },
   });
   try {
     const paginas = [];
     for (let numero = 1; numero <= pdf.numPages; numero++) {
-      tituloDaPagina = `Reconhecendo o texto: página ${numero} de ${pdf.numPages}...`;
-      informar(tituloDaPagina);
+      paginaAtual = numero;
+      informar({ pagina: numero, total: pdf.numPages, fracao: 0 });
       const pagina = await comOWorker(pdf.getPage(numero));
       const viewport = pagina.getViewport({ scale: ESCALA_OCR });
       const canvas = document.createElement('canvas');
@@ -880,14 +923,11 @@ statusOcrIniciar.addEventListener('click', async () => {
   const file = ultimosArquivos[0];
   if (!file || ultimosArquivos.length !== 1) return;
   const selecao = numeroDaSelecao;
-  mostrarStatusProcessando(`Reconhecendo o texto de ${file.name}...`);
-  const aviso = 'O reconhecimento roda no navegador, e o documento não sai do computador. '
-    + 'O texto reconhecido pode conter erros. Na primeira vez, a página baixa cerca de 7 MB.';
+  mostrarStatusProcessando('Preparando o reconhecimento de texto');
   try {
-    const texto = await reconhecerTextoDoPdf(file, (titulo, detalhe) => {
+    const texto = await reconhecerTextoDoPdf(file, (andamento) => {
       if (selecao !== numeroDaSelecao) return;
-      statusTitle.textContent = titulo;
-      statusDesc.textContent = detalhe ? `${detalhe}. ${aviso}` : aviso;
+      mostrarAndamentoOcr(andamento);
     });
     textosReconhecidos.set(file, texto);
   } catch (err) {

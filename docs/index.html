@@ -17,7 +17,7 @@
   <!-- Bibliotecas servidas localmente (vendor/), com versão fixa e sem depender de CDN de terceiros -->
   <!-- O ?v= é a marca de versão do conteúdo, gravada por scripts/bundle_web.py: cada versão
        tem um endereço próprio, e nenhum cache entrega o HTML novo com o CSS ou o app.js antigo -->
-  <link href="estilos.css?v=def2c02a42" rel="stylesheet">
+  <link href="estilos.css?v=cc9140868d" rel="stylesheet">
   <link href="vendor/fonts.css" rel="stylesheet">
   <script src="vendor/lucide-1.33.0.min.js"></script>
   <script src="vendor/jszip-3.10.1.min.js"></script>
@@ -85,12 +85,22 @@
     <!-- Situação do conversor. É um quadro colorido durante o carregamento, a conversão e o
        erro, e uma linha discreta quando está tudo pronto (ver app.js) -->
     <div id="pyodide-status-card" role="status" aria-live="polite" class="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300">
-      <div class="flex items-center space-x-3">
+      <div class="flex flex-1 min-w-0 items-center space-x-3">
         <div id="status-spinner" class="animate-spin text-blue-600">
           <i data-lucide="loader-2" class="w-5 h-5"></i>
         </div>
-        <div>
+        <div class="flex-1 min-w-0">
           <p id="status-title" class="text-sm font-semibold text-blue-900">Preparando o conversor...</p>
+          <!-- Só no reconhecimento de texto (ver mostrarAndamentoOcr) -->
+          <div id="status-progresso" class="hidden mt-2 mb-1.5 max-w-md">
+            <div id="status-progresso-trilho" class="h-1.5 rounded-full bg-blue-200/60 overflow-hidden">
+              <div id="status-progresso-barra" class="h-full w-0 rounded-full bg-blue-600 transition-all duration-300"></div>
+            </div>
+            <div class="flex justify-between gap-3 mt-1 text-xs font-medium text-blue-800 tabular-nums">
+              <span id="status-progresso-etapa"></span>
+              <span id="status-progresso-porcento"></span>
+            </div>
+          </div>
           <p id="status-desc" class="text-sm text-blue-700">Na primeira visita, o carregamento leva alguns segundos.</p>
           <!-- Só aparecem em erro de carregamento ou de conversão (ver mostrarStatusErro). O
                reconhecimento de texto, só no PDF sem camada de texto -->
@@ -411,7 +421,7 @@
   </footer>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=1f5197dafb"></script>
+  <script src="app.js?v=09040c7b70"></script>
 
   <!-- Contagem de acessos, sem cookies. Fica fora do service worker: sem rede, a visita
        apenas não é contada, e a página continua abrindo -->
