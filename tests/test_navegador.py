@@ -203,9 +203,20 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     cartao.wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
     assert "3 parágrafos vêm antes do item 1" in cartao.inner_text()
 
+    # O resumo da conversão fica só para o leitor de tela (o quadro do resultado já diz o
+    # mesmo), o limite só aparece quando o arquivo não cabe, e Copiar é o único botão
+    # principal da tela
+    assert pagina.locator("#pyodide-status-card").evaluate("el => el.classList.contains('sr-only')")
+    assert "Cabe no limite" not in pagina.locator("#res-parts-list").inner_text()
+    assert "bg-white" in (pagina.locator("#btn-selecionar").get_attribute("class") or "")
+
+    marca = pagina.locator("[data-parte='0'] [data-marca-copiada]")
+    assert marca.is_hidden()
     copiado = _copiar(pagina)
     assert "NOTA TÉCNICA" in copiado
     assert 'class="Item_Nivel1"' in copiado
+    # A marca de parte copiada fica depois que o "Copiado" do botão some
+    assert marca.is_visible()
 
     # Omitir cabeçalho converte de novo, e o HTML copiado começa no item 1
     pagina.click("#btn-cabecalho")

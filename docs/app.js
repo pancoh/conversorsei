@@ -42,6 +42,7 @@ const dropTitulo = document.getElementById('drop-titulo');
 const dropDetalhes = ['drop-icone', 'drop-formatos', 'drop-ajuda'].map(id => document.getElementById(id));
 const btnSelecionar = document.getElementById('btn-selecionar');
 const btnSelecionarTexto = document.getElementById('btn-selecionar-texto');
+const dropConteudo = document.getElementById('drop-conteudo');
 
 const toggleOptionsBtn = document.getElementById('toggle-options-btn');
 const optionsPanel = document.getElementById('options-panel');
@@ -114,6 +115,16 @@ function refreshIcons() {
 // nome acessível é fixo (aria-label), e quem fala a confirmação é a região de anúncio,
 // com o rótulo do cartão, para quem usa leitor de tela saber qual parte copiou
 const temporizadoresDaCopia = new WeakMap();
+
+// O "Copiado" do botão dura dois segundos. Num documento em várias partes, a pessoa
+// perdia a conta de quais já tinha colado: a marca no quadro da parte fica até a
+// próxima conversão
+function marcarComoCopiada(card) {
+  if (!card) return;
+  card.classList.replace('border-slate-200', 'border-emerald-400/60');
+  const marca = card.querySelector('[data-marca-copiada]');
+  marca.classList.replace('hidden', 'inline-flex');
+}
 
 function mostrarCopiado(botao, copiado) {
   clearTimeout(temporizadoresDaCopia.get(botao));
@@ -432,12 +443,12 @@ print("conversorsei pronto versão:", conversorsei.__version__)
     solicitarReparoDoCache();
   } catch (err) {
     console.error('Erro na inicialização do Pyodide:', err);
-    pyodideStatusCard.className = 'bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
+    pyodideStatusCard.className = CLASSE_QUADRO_ERRO;
     statusSpinner.innerHTML = '<i data-lucide="alert-circle" class="w-5 h-5 text-rose-600"></i>';
-    statusSpinner.className = '';
+    statusSpinner.className = 'self-start';
     statusTitle.className = 'text-sm font-semibold text-rose-900';
     statusTitle.textContent = 'Não foi possível carregar o conversor';
-    statusDesc.className = 'text-sm text-rose-700 break-all';
+    statusDesc.className = `${CLASSE_DESCRICAO_ERRO} break-all`;
     statusDesc.textContent = enderecoEmCarga
       ? `Não foi possível carregar um componente de ${enderecoEmCarga}. Informe esse endereço à TI ou tente outra rede.`
       : 'Os componentes foram carregados, mas o conversor não iniciou. Recarregue a página e tente novamente.';
@@ -647,19 +658,21 @@ async function processFiles(files) {
       cabecalho_trechos: trechosCabecalho,
       documentos_com_cabecalho: documentosComCabecalho,
       limite_kb: limiteKb,
-    }
+    },
+    elapsedSeconds
   );
 
   const resumo = falhas.length
     ? `${files.length - falhas.length} de ${files.length} documentos convertidos em ${formatarSegundos(elapsedSeconds)}. ${plural(falhas.length, 'falhou', 'falharam')}.`
     : `${files.length} documentos convertidos em ${formatarSegundos(elapsedSeconds)}, com ${plural(gerados.length, 'arquivo gerado', 'arquivos gerados')}.`;
-  mostrarStatusDiscreto(resumo);
+  mostrarStatusSoParaLeitorDeTela(resumo);
   return true;
 }
 
 // Resultado fora de uso: escondido (seleção nova ou falha) ou suspenso (conversão dos
 // mesmos arquivos em andamento). O inert tira os botões do alcance do teclado também
 function ocultarResultado() {
+  destacarEnvio(true);
   reativarResultado();
   resultsSection.classList.add('hidden');
   currentResultFiles = [];
@@ -677,13 +690,18 @@ function reativarResultado() {
   resultsSection.removeAttribute('aria-busy');
 }
 
-// Estados do cartão de status
+// Estados do cartão de status. No erro, o vermelho fica no ícone e no título: com a
+// explicação também em vermelho, o quadro inteiro pesava e cansava a leitura. O ícone
+// acompanha a primeira linha, e não o meio do quadro, quando o texto ocupa várias
+const CLASSE_QUADRO_ERRO = 'bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
+const CLASSE_DESCRICAO_ERRO = 'text-sm text-slate-700';
+
 function mostrarStatusProcessando(titulo) {
   statusRelato.classList.add('hidden');
   statusOcrIniciar.classList.add('hidden');
   statusProgresso.classList.add('hidden');
   pyodideStatusCard.className = 'bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
-  statusSpinner.className = 'animate-spin text-blue-600';
+  statusSpinner.className = 'animate-spin text-blue-600 self-start';
   statusSpinner.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5"></i>';
   statusTitle.className = 'text-sm font-semibold text-blue-900';
   statusTitle.textContent = titulo;
@@ -708,6 +726,14 @@ function mostrarStatusDiscreto(texto) {
   refreshIcons();
 }
 
+// Com o resultado na tela, o resumo da conversão fica só para o leitor de tela: visível,
+// repetia o nome e o número de partes que o quadro do resultado mostra logo abaixo. O
+// tempo passa para o quadro do resultado
+function mostrarStatusSoParaLeitorDeTela(texto) {
+  mostrarStatusDiscreto(texto);
+  pyodideStatusCard.className = 'sr-only';
+}
+
 // Trecho da mensagem do pdf_converter para o PDF sem camada de texto. O teste
 // test_mensagem_do_pdf_sem_texto_oferece_o_ocr confere que os dois batem
 const MARCA_PDF_SEM_TEXTO = 'não tem camada de texto';
@@ -719,12 +745,12 @@ function mostrarStatusErro(titulo, descricao) {
   const semTexto = String(descricao || '').includes(MARCA_PDF_SEM_TEXTO);
   // O reconhecimento é de um documento por vez: no lote, a falha fica na lista
   statusOcrIniciar.classList.toggle('hidden', !(semTexto && ultimosArquivos.length === 1));
-  pyodideStatusCard.className = 'bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between transition-all duration-300';
+  pyodideStatusCard.className = CLASSE_QUADRO_ERRO;
   statusSpinner.innerHTML = '<i data-lucide="alert-circle" class="w-5 h-5 text-rose-600"></i>';
-  statusSpinner.className = '';
+  statusSpinner.className = 'self-start';
   statusTitle.className = 'text-sm font-semibold text-rose-900';
   statusTitle.textContent = titulo;
-  statusDesc.className = 'text-sm text-rose-700';
+  statusDesc.className = CLASSE_DESCRICAO_ERRO;
   statusDesc.textContent = descricao || 'Verifique o formato do documento.';
   refreshIcons();
 }
@@ -1025,9 +1051,9 @@ async function processFile(file, selecao, opcoes) {
     }
 
     currentResultFiles = result.arquivos;
-    renderResults(result);
+    renderResults(result, elapsedSeconds);
     const partes = result.arquivos.length === 1 ? 'em arquivo único' : `em ${result.arquivos.length} partes`;
-    mostrarStatusDiscreto(`${file.name} convertido em ${formatarSegundos(elapsedSeconds)}, ${partes}.`);
+    mostrarStatusSoParaLeitorDeTela(`${file.name} convertido em ${formatarSegundos(elapsedSeconds)}, ${partes}.`);
   } catch (err) {
     if (selecao !== numeroDaSelecao) return false;
     console.error('Erro na conversão:', err);
@@ -1108,14 +1134,11 @@ function renderCabecalho(total, documentos, trechos) {
   resCabecalhoResumo.classList.remove('hidden');
 }
 
-// Diz se o arquivo cabe numa colagem no SEI Pro. Um pacote antigo, ainda no cache,
-// não manda a informação: o cartão mostra só o tamanho
+// Avisa quando o arquivo não cabe numa colagem no SEI Pro. Caber é o normal: repetido
+// em verde em cada parte, o "cabe no limite" virava ruído. Um pacote antigo, ainda no
+// cache, não manda a informação, e o cartão mostra só o tamanho
 function situacaoDoLimite(arq, limiteKb) {
-  if (typeof arq.cabe_no_limite !== 'boolean' || !limiteKb) return '';
-  if (arq.cabe_no_limite) {
-    return `<span class="inline-flex items-center gap-1 text-emerald-700">
-      <i data-lucide="check" class="w-3.5 h-3.5"></i>Cabe no limite do SEI Pro (${limiteKb} KB)</span>`;
-  }
+  if (arq.cabe_no_limite !== false || !limiteKb) return '';
   return `<span class="inline-flex items-center gap-1 text-amber-700">
     <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>Acima do limite do SEI Pro (${limiteKb} KB): a formatação pode se perder ao colar</span>`;
 }
@@ -1124,8 +1147,9 @@ function situacaoDoLimite(arq, limiteKb) {
 // uma faixa e deixa de empurrar o resultado para baixo. Arrastar continua valendo
 function compactarAreaDeEnvio() {
   dropDetalhes.forEach(el => el.classList.add('hidden'));
+  dropConteudo.classList.add('sm:flex', 'sm:items-center', 'sm:justify-center', 'sm:gap-4', 'sm:space-y-0');
   dropZone.classList.remove('p-6', 'sm:p-8');
-  dropZone.classList.add('p-4', 'sm:p-5');
+  dropZone.classList.add('p-4');
   dropTitulo.textContent = 'Converter outro documento';
   dropTitulo.classList.remove('hidden');
 }
@@ -1141,13 +1165,25 @@ function ajustarGuia(arquivos) {
   guiaPassos.classList.toggle('md:grid-cols-3', dividido);
 }
 
+// Com o resultado na tela, a ação principal é copiar: o botão de enviar outro arquivo
+// passa a ter contorno, como Baixar, e deixa de disputar a atenção com Copiar. Sem
+// resultado (erro ou seleção nova), volta a ser o botão principal
+const CLASSES_BOTAO_PRINCIPAL = ['bg-blue-700', 'hover:bg-blue-800', 'active:bg-blue-800', 'text-white'];
+const CLASSES_BOTAO_SECUNDARIO = ['bg-white', 'hover:bg-slate-50', 'active:bg-slate-100', 'text-slate-700', 'border', 'border-slate-300'];
+
+function destacarEnvio(principal) {
+  btnSelecionar.classList.remove(...(principal ? CLASSES_BOTAO_SECUNDARIO : CLASSES_BOTAO_PRINCIPAL));
+  btnSelecionar.classList.add(...(principal ? CLASSES_BOTAO_PRINCIPAL : CLASSES_BOTAO_SECUNDARIO));
+}
+
 // Renderização dos Resultados
-function renderResults(result) {
+function renderResults(result, segundos) {
   registrarParaRelato(
     `Conversão concluída, ${plural(result.arquivos.length, 'arquivo gerado', 'arquivos gerados')}`,
     result.avisos || []
   );
   compactarAreaDeEnvio();
+  destacarEnvio(false);
   reativarResultado();
   // Depois da conversão, o arquivo pronto aparece antes da área de novo envio.
   if (resultsSection.previousElementSibling !== pyodideStatusCard) {
@@ -1162,6 +1198,7 @@ function renderResults(result) {
   } else {
     resPartsCount.textContent = emLote ? `${totalPartes} arquivos gerados` : `${totalPartes} partes geradas`;
   }
+  if (typeof segundos === 'number') resPartsCount.textContent += ` em ${formatarSegundos(segundos)}`;
 
   // Exibir botão de download no topo apenas quando for particionado (Download do ZIP com tudo)
   if (totalPartes > 1) {
@@ -1201,7 +1238,8 @@ function renderResults(result) {
     const card = document.createElement('div');
     // Informações em cima e botões embaixo: na coluna estreita da página, lado a lado, o
     // nome, o tamanho e o limite quebravam em três linhas
-    card.className = 'bg-white border border-slate-200 rounded-xl p-4 sm:p-5 flex flex-col gap-3';
+    card.className = 'bg-white border border-slate-200 rounded-xl p-4 sm:p-5 flex flex-col gap-3 transition-colors';
+    card.dataset.parte = String(index);
     
     // O rótulo diz o que o arquivo é. O nome do arquivo vai em segundo plano: no
     // documento único, ele só repetia o nome já exibido no cabeçalho do resultado
@@ -1216,7 +1254,12 @@ function renderResults(result) {
 
     card.innerHTML = `
       <div class="space-y-1 min-w-0 flex-1">
-        <p class="font-semibold text-sm text-slate-800 break-all">${escapeHtml(rotulo)}</p>
+        <div class="flex items-start justify-between gap-3">
+          <p class="font-semibold text-sm text-slate-800 break-all">${escapeHtml(rotulo)}</p>
+          <span data-marca-copiada class="hidden shrink-0 items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-400/15 text-xs font-semibold text-emerald-700">
+            <i data-lucide="check" class="w-3.5 h-3.5"></i>Copiada
+          </span>
+        </div>
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
           <span class="break-all">${escapeHtml(arq.nome)}</span>
           <span>•</span>
@@ -1272,6 +1315,7 @@ function renderResults(result) {
       const copiado = await copiarHtml(arq.conteudo);
       // Sem o HTML, o botão sai do "Copiado" de uma cópia anterior, para não contradizer o alerta
       mostrarCopiado(botao, copiado === 'html');
+      if (copiado === 'html') marcarComoCopiada(botao.closest('[data-parte]'));
       if (copiado === 'texto') {
         showToast(
           'Este navegador copiou só o texto, sem a formatação: colado no SEI, ele mostraria as tags. '
