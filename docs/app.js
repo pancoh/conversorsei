@@ -725,13 +725,17 @@ function mostrarStatusErro(titulo, descricao) {
 // imagem e o Tesseract reconhece o texto em português. Tudo vem de vendor/ e só é
 // baixado quando alguém pede o reconhecimento: são cerca de 7 MB, e a maioria dos
 // documentos não precisa deles. O documento não sai do navegador
+// A versão legacy do PDF.js traz quase todos os recursos novos de JavaScript que ele usa
+// (Map.getOrInsertComputed): sem eles, o OCR falhava no Samsung Internet do Android. O
+// que ela não traz vem de pdfjs-compativel.js, na página e no worker
+const PASTA_PDFJS = 'vendor/pdfjs-legacy-6.3.289/';
 const OCR = {
-  // A versão legacy do PDF.js traz os recursos novos de JavaScript que ele usa
-  // (Map.getOrInsertComputed): sem eles, o OCR falhava no Samsung Internet do Android
-  pdfjs: 'vendor/pdfjs-legacy-6.3.289/pdf.min.js',
-  pdfjsWorker: 'vendor/pdfjs-legacy-6.3.289/pdf.worker.min.js',
+  pdfjsCompativel: 'pdfjs-compativel.js',
+  pdfjs: `${PASTA_PDFJS}pdf.min.js`,
+  // Importa o worker da PASTA_PDFJS depois de completar os recursos
+  pdfjsWorker: 'pdfjs-worker.js',
   // Decodificadores de imagem (JBIG2 e JPEG 2000), comuns em documento digitalizado
-  pdfjsWasm: 'vendor/pdfjs-legacy-6.3.289/wasm/',
+  pdfjsWasm: `${PASTA_PDFJS}wasm/`,
   tesseract: 'vendor/tesseract-7.0.0/tesseract.min.js',
   tesseractWorker: 'vendor/tesseract-7.0.0/worker.min.js',
   // O Tesseract escolhe a variante do motor que o navegador suporta (com ou sem SIMD)
@@ -775,6 +779,7 @@ const ETAPAS_DO_TESSERACT = {
 // andamento dentro dela
 async function reconhecerTextoDoPdf(file, informar) {
   informar('Carregando o OCR...');
+  await import(enderecoLocal(OCR.pdfjsCompativel));
   const pdfjs = await import(enderecoLocal(OCR.pdfjs));
   pdfjs.GlobalWorkerOptions.workerSrc = enderecoLocal(OCR.pdfjsWorker);
   if (!window.Tesseract) await carregarScriptLocal(enderecoLocal(OCR.tesseract));

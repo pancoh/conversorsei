@@ -391,6 +391,31 @@ def _pdf_de_imagem(jpeg: bytes, largura: int, altura: int) -> bytes:
     return pdf
 
 
+# Apaga, na página e no worker do PDF.js, os recursos de JavaScript que um navegador menos
+# atualizado não tem. O script de inicialização do Playwright não roda dentro dos workers:
+# o worker do PDF.js é trocado por um módulo que apaga os recursos e só então importa o
+# original, em dois módulos porque os import estáticos rodam antes do resto do arquivo
+SEM_RECURSOS_NOVOS_NA_PAGINA_E_NOS_WORKERS = """
+(() => {
+  const apagar = `
+    for (const tipo of [Map, WeakMap])
+      for (const nome of ['getOrInsert', 'getOrInsertComputed']) delete tipo.prototype[nome];
+    delete Promise.withResolvers;
+  `;
+  new Function(apagar)();
+  const WorkerOriginal = window.Worker;
+  window.Worker = function (url, opcoes) {
+    const endereco = new URL(url, location.href).href;
+    if (!endereco.includes('pdfjs')) return new WorkerOriginal(url, opcoes);
+    const modulo = (codigo) => URL.createObjectURL(new Blob([codigo], { type: 'text/javascript' }));
+    const entrada = modulo(`import '${modulo(apagar)}'; import '${endereco}';`);
+    return new WorkerOriginal(entrada, { ...opcoes, type: 'module' });
+  };
+  window.Worker.prototype = WorkerOriginal.prototype;
+})();
+"""
+
+
 def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco: str) -> None:
     """PDF sem camada de texto: o botão do erro reconhece as páginas no navegador, e o
     texto segue a conversão do PDF, com o aviso para conferir. Mudar uma opção converte
@@ -400,13 +425,9 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     pagina.on("pageerror", lambda erro: erros.append(str(erro)))
     console: list[str] = []
     pagina.on("console", lambda msg: console.append(f"{msg.type}: {msg.text}"))
-    # Simula um navegador sem os recursos mais novos de Map e WeakMap, como o Samsung
-    # Internet do Android: o PDF.js comum falhava ali, e o Playwright usa navegadores de
-    # última versão, que os têm
-    pagina.add_init_script(
-        "for (const tipo of [Map, WeakMap])"
-        " for (const nome of ['getOrInsert', 'getOrInsertComputed']) delete tipo.prototype[nome];"
-    )
+    # Simula um navegador sem os recursos mais novos que o PDF.js usa, como o Samsung
+    # Internet do Android: o Playwright usa navegadores de última versão, que os têm
+    pagina.add_init_script(SEM_RECURSOS_NOVOS_NA_PAGINA_E_NOS_WORKERS)
 
     # A "digitalização": o texto vira imagem, sem nenhuma fonte no PDF
     pagina.set_viewport_size({"width": 794, "height": 1123})

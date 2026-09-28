@@ -154,3 +154,17 @@ def test_mensagem_do_pdf_sem_texto_oferece_o_ocr():
     assert m, "MARCA_PDF_SEM_TEXTO não encontrada em app.js"
     fonte = (DOCS.parent / "conversorsei" / "pdf_converter.py").read_text(encoding="utf-8")
     assert m.group(1) in fonte
+
+
+def test_worker_do_pdfjs_e_da_mesma_pasta_que_a_pagina():
+    """O worker do PDF.js vem de pdfjs-worker.js, que o importa da pasta com a versão no
+    nome. Página e worker de versões diferentes se recusam a trabalhar juntos, e o erro
+    só apareceria na hora do OCR."""
+    app = APP.read_text(encoding="utf-8")
+    m = re.search(r"const PASTA_PDFJS = '([^']+)'", app)
+    assert m, "PASTA_PDFJS não encontrada em app.js"
+    pasta = m.group(1)
+    assert (DOCS / pasta / "pdf.min.js").is_file() and (DOCS / pasta / "pdf.worker.min.js").is_file()
+    worker = (DOCS / "pdfjs-worker.js").read_text(encoding="utf-8")
+    imports = re.findall(r"^import '([^']+)';", worker, flags=re.M)
+    assert imports == ["./pdfjs-compativel.js", f"./{pasta}pdf.worker.min.js"]
