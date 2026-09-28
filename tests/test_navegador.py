@@ -14,6 +14,7 @@ o CDN do Pyodide, e levam perto de um minuto. Para rodar:
 """
 from __future__ import annotations
 
+import re
 import threading
 import time
 from collections.abc import Iterator
@@ -394,7 +395,8 @@ def _pdf_de_imagem(jpeg: bytes, largura: int, altura: int) -> bytes:
 # Apaga, na página e no worker do PDF.js, os recursos de JavaScript que um navegador menos
 # atualizado não tem. O script de inicialização do Playwright não roda dentro dos workers:
 # o worker do PDF.js é trocado por um módulo que apaga os recursos e só então importa o
-# original, em dois módulos porque os import estáticos rodam antes do resto do arquivo
+# original, em dois módulos porque os import estáticos rodam antes do resto do arquivo.
+# `__WORKER__` é o que o módulo importa: o endereço pedido pela página, ou outro no lugar
 SEM_RECURSOS_NOVOS_NA_PAGINA_E_NOS_WORKERS = """
 (() => {
   const apagar = `
@@ -407,13 +409,20 @@ SEM_RECURSOS_NOVOS_NA_PAGINA_E_NOS_WORKERS = """
   window.Worker = function (url, opcoes) {
     const endereco = new URL(url, location.href).href;
     if (!endereco.includes('pdfjs')) return new WorkerOriginal(url, opcoes);
+    const alvo = new URL(__WORKER__ || endereco, location.href).href;
     const modulo = (codigo) => URL.createObjectURL(new Blob([codigo], { type: 'text/javascript' }));
-    const entrada = modulo(`import '${modulo(apagar)}'; import '${endereco}';`);
+    const entrada = modulo(`import '${modulo(apagar)}'; import '${alvo}';`);
     return new WorkerOriginal(entrada, { ...opcoes, type: 'module' });
   };
   window.Worker.prototype = WorkerOriginal.prototype;
 })();
 """
+
+
+def _sem_recursos_novos(worker: str | None = None) -> str:
+    """Script de inicialização que simula o navegador menos atualizado. Com `worker`, o
+    worker do PDF.js importa esse endereço no lugar do pedido pela página."""
+    return SEM_RECURSOS_NOVOS_NA_PAGINA_E_NOS_WORKERS.replace("__WORKER__", repr(worker) if worker else "null")
 
 
 def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco: str) -> None:
@@ -427,7 +436,7 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     pagina.on("console", lambda msg: console.append(f"{msg.type}: {msg.text}"))
     # Simula um navegador sem os recursos mais novos que o PDF.js usa, como o Samsung
     # Internet do Android: o Playwright usa navegadores de última versão, que os têm
-    pagina.add_init_script(SEM_RECURSOS_NOVOS_NA_PAGINA_E_NOS_WORKERS)
+    pagina.add_init_script(_sem_recursos_novos())
 
     # A "digitalização": o texto vira imagem, sem nenhuma fonte no PDF
     pagina.set_viewport_size({"width": 794, "height": 1123})
@@ -473,3 +482,32 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     assert "padronizacao dos relatorios mensais" in pagina.evaluate("() => currentResultFiles[0].conteudo")
 
     assert erros == []
+
+
+def test_erro_no_worker_do_pdfjs_aparece_na_tela(contexto: object, endereco: str) -> None:
+    """Um erro dentro do worker do PDF.js não rejeita a promessa do PDF.js: sem a página
+    ouvir o worker, o OCR ficava parado em "Abrindo o PDF..." até a pessoa desistir. Aqui
+    o worker roda sem os recursos que faltam ao navegador, e o erro tem de chegar à tela."""
+    app = (DOCS / "app.js").read_text(encoding="utf-8")
+    pasta = re.search(r"const PASTA_PDFJS = '([^']+)'", app)
+    assert pasta, "PASTA_PDFJS não encontrada em app.js"
+    pagina = contexto.new_page()  # type: ignore[attr-defined]
+    pagina.add_init_script(_sem_recursos_novos(f"{pasta.group(1)}pdf.worker.min.js"))
+
+    pagina.set_viewport_size({"width": 794, "height": 1123})
+    pagina.set_content(PAGINA_DIGITALIZADA)
+    jpeg = pagina.screenshot(type="jpeg", quality=90)
+    pdf = _pdf_de_imagem(jpeg, 794, 1123)
+
+    pagina.goto(endereco)
+    _esperar_conversor(pagina)
+    pagina.set_input_files(
+        "#file-input", files=[{"name": "digitalizado.pdf", "mimeType": "application/pdf", "buffer": pdf}]
+    )
+    pagina.locator("#status-ocr-iniciar").wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
+    pagina.click("#status-ocr-iniciar")
+    # Bem antes do prazo do OCR: o erro vem assim que o PDF.js pede algo ao worker
+    pagina.locator("#pyodide-status-card", has_text="O leitor de PDF parou com um erro").wait_for(
+        timeout=PRAZO_CONVERSAO_MS
+    )
+    assert "Não foi possível reconhecer o texto" in pagina.locator("#pyodide-status-card").inner_text()

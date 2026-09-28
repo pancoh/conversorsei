@@ -781,20 +781,53 @@ async function reconhecerTextoDoPdf(file, informar) {
   informar('Carregando o OCR...');
   await import(enderecoLocal(OCR.pdfjsCompativel));
   const pdfjs = await import(enderecoLocal(OCR.pdfjs));
-  pdfjs.GlobalWorkerOptions.workerSrc = enderecoLocal(OCR.pdfjsWorker);
   if (!window.Tesseract) await carregarScriptLocal(enderecoLocal(OCR.tesseract));
 
-  informar('Abrindo o PDF...');
-  const carregamento = pdfjs.getDocument({
-    data: new Uint8Array(await file.arrayBuffer()),
-    wasmUrl: enderecoLocal(OCR.pdfjsWasm),
-    isEvalSupported: false,
-    // JPEG pelo decodificador do próprio PDF.js, e não pelo ImageDecoder do navegador:
-    // no WebKit de Linux, a página em JPEG (o formato comum da digitalização) saía em
-    // branco, sem erro, e o OCR não achava texto
-    isImageDecoderSupported: false,
+  // O worker do PDF.js é criado aqui, e não pelo PDF.js, para a página ouvir os erros
+  // dele: um erro dentro do worker não rejeita a promessa do PDF.js, e o OCR ficava
+  // parado em "Abrindo o PDF..." sem dizer nada. `comOWorker` encerra a espera no erro
+  const workerDoPdf = new Worker(enderecoLocal(OCR.pdfjsWorker), { type: 'module' });
+  const falhaDoWorker = new Promise((_, rejeitar) => {
+    workerDoPdf.addEventListener('error', (evento) => {
+      const causa = evento.message ? ` (${evento.message})` : '';
+      rejeitar(new Error(`O leitor de PDF parou com um erro${causa}. `
+        + 'Atualize o navegador ou tente em outro.'));
+    });
   });
-  const pdf = await carregamento.promise;
+  // Sem isto, a rejeição ficaria sem tratamento quando o erro chega entre duas esperas
+  falhaDoWorker.catch(() => {});
+  const comOWorker = (promessa) => Promise.race([promessa, falhaDoWorker]);
+  const leitor = pdfjs.PDFWorker.create({ port: workerDoPdf });
+  let carregamento = null;
+  try {
+    informar('Abrindo o PDF...');
+    carregamento = pdfjs.getDocument({
+      worker: leitor,
+      data: new Uint8Array(await file.arrayBuffer()),
+      wasmUrl: enderecoLocal(OCR.pdfjsWasm),
+      isEvalSupported: false,
+      // JPEG pelo decodificador do próprio PDF.js, e não pelo ImageDecoder do navegador:
+      // no WebKit de Linux, a página em JPEG (o formato comum da digitalização) saía em
+      // branco, sem erro, e o OCR não achava texto
+      isImageDecoderSupported: false,
+    });
+    const pdf = await comOWorker(carregamento.promise);
+    return await reconhecerPaginas(pdf, comOWorker, informar);
+  } finally {
+    // No PDF.js 6, quem libera o documento é a tarefa de carregamento. Ela espera a
+    // resposta do worker, que não vem se ele parou com erro. O worker criado pela página
+    // não é encerrado pelo PDF.js: fica por conta dela
+    try {
+      await comOWorker(carregamento?.destroy());
+    } catch {
+      // O erro que importa é o do reconhecimento, que segue adiante
+    }
+    leitor.destroy();
+    workerDoPdf.terminate();
+  }
+}
+
+async function reconhecerPaginas(pdf, comOWorker, informar) {
   let tituloDaPagina = 'Preparando o motor de OCR...';
   informar(tituloDaPagina);
   // O worker vem do próprio site, e não de um blob: assim o service worker o controla e
@@ -817,12 +850,12 @@ async function reconhecerTextoDoPdf(file, informar) {
     for (let numero = 1; numero <= pdf.numPages; numero++) {
       tituloDaPagina = `Reconhecendo o texto: página ${numero} de ${pdf.numPages}...`;
       informar(tituloDaPagina);
-      const pagina = await pdf.getPage(numero);
+      const pagina = await comOWorker(pdf.getPage(numero));
       const viewport = pagina.getViewport({ scale: ESCALA_OCR });
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
-      await pagina.render({ canvas, viewport }).promise;
+      await comOWorker(pagina.render({ canvas, viewport }).promise);
       const { data } = await reconhecedor.recognize(canvas);
       paginas.push(data.text);
       pagina.cleanup();
@@ -833,8 +866,6 @@ async function reconhecerTextoDoPdf(file, informar) {
     return paginas.join('\n\n');
   } finally {
     await reconhecedor.terminate();
-    // No PDF.js 6, quem libera o documento e o worker dele é a tarefa de carregamento
-    await carregamento.destroy();
   }
 }
 
