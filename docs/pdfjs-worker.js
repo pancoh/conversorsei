@@ -1,5 +1,5 @@
-// Worker do PDF.js: completa os recursos que faltam ao navegador e só então carrega o
-// original. Os import rodam na ordem em que aparecem. A pasta tem de ser a mesma de
-// OCR.pdfjs em app.js: página e worker de versões diferentes se recusam a trabalhar juntos
+// Entrada anterior do worker do PDF.js, sem a versão no nome. Fica para as abas abertas
+// antes de ela ganhar a versão (2026-09-27), que ainda pedem este arquivo, e pode sair
+// junto com a pasta vendor/pdfjs-6.3.289/
 import './pdfjs-compativel.js';
 import './vendor/pdfjs-legacy-6.3.289/pdf.worker.min.js';

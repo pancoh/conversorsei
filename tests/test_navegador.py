@@ -484,15 +484,25 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     assert erros == []
 
 
-def test_erro_no_worker_do_pdfjs_aparece_na_tela(contexto: object, endereco: str) -> None:
+@pytest.mark.parametrize(
+    ("worker", "mensagem"),
+    [
+        # O worker original, sem os recursos que completam o navegador
+        ("vendor/pdfjs-{versao}/pdf.worker.min.js", "O leitor de PDF parou com um erro"),
+        # Um arquivo que não carrega: a orientação é a conexão, e não o navegador
+        ("nao-existe.js", "Não foi possível carregar o leitor de PDF"),
+    ],
+    ids=["sem-recursos", "nao-carrega"],
+)
+def test_erro_no_worker_do_pdfjs_aparece_na_tela(contexto: object, endereco: str, worker: str, mensagem: str) -> None:
     """Um erro dentro do worker do PDF.js não rejeita a promessa do PDF.js: sem a página
     ouvir o worker, o OCR ficava parado em "Abrindo o PDF..." até a pessoa desistir. Aqui
-    o worker roda sem os recursos que faltam ao navegador, e o erro tem de chegar à tela."""
+    o worker falha, e o erro tem de chegar à tela, com a orientação certa."""
     app = (DOCS / "app.js").read_text(encoding="utf-8")
-    pasta = re.search(r"const PASTA_PDFJS = '([^']+)'", app)
-    assert pasta, "PASTA_PDFJS não encontrada em app.js"
+    versao = re.search(r"const VERSAO_PDFJS = '([^']+)'", app)
+    assert versao, "VERSAO_PDFJS não encontrada em app.js"
     pagina = contexto.new_page()  # type: ignore[attr-defined]
-    pagina.add_init_script(_sem_recursos_novos(f"{pasta.group(1)}pdf.worker.min.js"))
+    pagina.add_init_script(_sem_recursos_novos(worker.format(versao=versao.group(1))))
 
     pagina.set_viewport_size({"width": 794, "height": 1123})
     pagina.set_content(PAGINA_DIGITALIZADA)
@@ -507,7 +517,5 @@ def test_erro_no_worker_do_pdfjs_aparece_na_tela(contexto: object, endereco: str
     pagina.locator("#status-ocr-iniciar").wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
     pagina.click("#status-ocr-iniciar")
     # Bem antes do prazo do OCR: o erro vem assim que o PDF.js pede algo ao worker
-    pagina.locator("#pyodide-status-card", has_text="O leitor de PDF parou com um erro").wait_for(
-        timeout=PRAZO_CONVERSAO_MS
-    )
+    pagina.locator("#pyodide-status-card", has_text=mensagem).wait_for(timeout=PRAZO_CONVERSAO_MS)
     assert "Não foi possível reconhecer o texto" in pagina.locator("#pyodide-status-card").inner_text()

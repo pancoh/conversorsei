@@ -156,15 +156,27 @@ def test_mensagem_do_pdf_sem_texto_oferece_o_ocr():
     assert m.group(1) in fonte
 
 
-def test_worker_do_pdfjs_e_da_mesma_pasta_que_a_pagina():
-    """O worker do PDF.js vem de pdfjs-worker.js, que o importa da pasta com a versão no
-    nome. Página e worker de versões diferentes se recusam a trabalhar juntos, e o erro
-    só apareceria na hora do OCR."""
+def test_worker_do_pdfjs_e_da_mesma_versao_que_a_pagina():
+    """O worker do PDF.js vem de um arquivo de entrada com a versão no nome, que o importa
+    da pasta com a mesma versão. Página e worker de versões diferentes se recusam a
+    trabalhar juntos, e o erro só apareceria na hora do OCR."""
     app = APP.read_text(encoding="utf-8")
-    m = re.search(r"const PASTA_PDFJS = '([^']+)'", app)
-    assert m, "PASTA_PDFJS não encontrada em app.js"
-    pasta = m.group(1)
-    assert (DOCS / pasta / "pdf.min.js").is_file() and (DOCS / pasta / "pdf.worker.min.js").is_file()
-    worker = (DOCS / "pdfjs-worker.js").read_text(encoding="utf-8")
+    m = re.search(r"const VERSAO_PDFJS = '([^']+)'", app)
+    assert m, "VERSAO_PDFJS não encontrada em app.js"
+    versao = m.group(1)
+    assert "const PASTA_PDFJS = `vendor/pdfjs-${VERSAO_PDFJS}/`;" in app
+    assert "pdfjsWorker: `pdfjs-worker-${VERSAO_PDFJS}.js`," in app
+    pasta = DOCS / "vendor" / f"pdfjs-{versao}"
+    assert (pasta / "pdf.min.js").is_file() and (pasta / "pdf.worker.min.js").is_file()
+    worker = (DOCS / f"pdfjs-worker-{versao}.js").read_text(encoding="utf-8")
     imports = re.findall(r"^import '([^']+)';", worker, flags=re.M)
-    assert imports == ["./pdfjs-compativel.js", f"./{pasta}pdf.worker.min.js"]
+    assert imports == ["./pdfjs-compativel.js", f"./vendor/pdfjs-{versao}/pdf.worker.min.js"]
+
+
+def test_entradas_antigas_do_worker_do_pdfjs_apontam_para_pastas_publicadas():
+    """Os arquivos de entrada de versões anteriores ficam para abas abertas antes de uma
+    troca. Cada um tem de importar um worker que ainda está no site."""
+    for entrada in DOCS.glob("pdfjs-worker*.js"):
+        texto = entrada.read_text(encoding="utf-8")
+        for caminho in re.findall(r"^import '\./([^']+)';", texto, flags=re.M):
+            assert (DOCS / caminho).is_file(), f"{entrada.name} importa {caminho}, que não existe"

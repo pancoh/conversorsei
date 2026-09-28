@@ -728,12 +728,13 @@ function mostrarStatusErro(titulo, descricao) {
 // A versão legacy do PDF.js traz quase todos os recursos novos de JavaScript que ele usa
 // (Map.getOrInsertComputed): sem eles, o OCR falhava no Samsung Internet do Android. O
 // que ela não traz vem de pdfjs-compativel.js, na página e no worker
-const PASTA_PDFJS = 'vendor/pdfjs-legacy-6.3.289/';
+const VERSAO_PDFJS = 'legacy-6.3.289';
+const PASTA_PDFJS = `vendor/pdfjs-${VERSAO_PDFJS}/`;
 const OCR = {
   pdfjsCompativel: 'pdfjs-compativel.js',
   pdfjs: `${PASTA_PDFJS}pdf.min.js`,
   // Importa o worker da PASTA_PDFJS depois de completar os recursos
-  pdfjsWorker: 'pdfjs-worker.js',
+  pdfjsWorker: `pdfjs-worker-${VERSAO_PDFJS}.js`,
   // Decodificadores de imagem (JBIG2 e JPEG 2000), comuns em documento digitalizado
   pdfjsWasm: `${PASTA_PDFJS}wasm/`,
   tesseract: 'vendor/tesseract-7.0.0/tesseract.min.js',
@@ -779,9 +780,12 @@ const ETAPAS_DO_TESSERACT = {
 // andamento dentro dela
 async function reconhecerTextoDoPdf(file, informar) {
   informar('Carregando o OCR...');
-  await import(enderecoLocal(OCR.pdfjsCompativel));
-  const pdfjs = await import(enderecoLocal(OCR.pdfjs));
-  if (!window.Tesseract) await carregarScriptLocal(enderecoLocal(OCR.tesseract));
+  // O Tesseract baixa junto com o PDF.js: numa rede de celular, em sequência a espera
+  // seria a soma das duas. Só o PDF.js precisa esperar os recursos que completam o navegador
+  const [pdfjs] = await Promise.all([
+    import(enderecoLocal(OCR.pdfjsCompativel)).then(() => import(enderecoLocal(OCR.pdfjs))),
+    window.Tesseract ? null : carregarScriptLocal(enderecoLocal(OCR.tesseract)),
+  ]);
 
   // O worker do PDF.js é criado aqui, e não pelo PDF.js, para a página ouvir os erros
   // dele: um erro dentro do worker não rejeita a promessa do PDF.js, e o OCR ficava
@@ -789,17 +793,20 @@ async function reconhecerTextoDoPdf(file, informar) {
   const workerDoPdf = new Worker(enderecoLocal(OCR.pdfjsWorker), { type: 'module' });
   const falhaDoWorker = new Promise((_, rejeitar) => {
     workerDoPdf.addEventListener('error', (evento) => {
-      const causa = evento.message ? ` (${evento.message})` : '';
-      rejeitar(new Error(`O leitor de PDF parou com um erro${causa}. `
-        + 'Atualize o navegador ou tente em outro.'));
+      // Sem mensagem, o arquivo do worker não carregou (sem rede ou fora do site), e
+      // atualizar o navegador não resolveria
+      rejeitar(new Error(evento.message
+        ? `O leitor de PDF parou com um erro (${evento.message}). Atualize o navegador ou tente em outro.`
+        : 'Não foi possível carregar o leitor de PDF. Confira a conexão e tente de novo.'));
     });
   });
   // Sem isto, a rejeição ficaria sem tratamento quando o erro chega entre duas esperas
   falhaDoWorker.catch(() => {});
   const comOWorker = (promessa) => Promise.race([promessa, falhaDoWorker]);
-  const leitor = pdfjs.PDFWorker.create({ port: workerDoPdf });
+  let leitor = null;
   let carregamento = null;
   try {
+    leitor = pdfjs.PDFWorker.create({ port: workerDoPdf });
     informar('Abrindo o PDF...');
     carregamento = pdfjs.getDocument({
       worker: leitor,
@@ -822,7 +829,7 @@ async function reconhecerTextoDoPdf(file, informar) {
     } catch {
       // O erro que importa é o do reconhecimento, que segue adiante
     }
-    leitor.destroy();
+    leitor?.destroy();
     workerDoPdf.terminate();
   }
 }
