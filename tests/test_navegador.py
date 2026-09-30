@@ -431,6 +431,14 @@ def test_texto_colado_converte_como_um_arquivo(contexto: object, endereco: str) 
     assert 'class="Texto_Ementa"' in copiado and "Ementa colada." in copiado
     assert "Formato: colado (.html)" in unquote(pagina.evaluate("() => linkDoRelato()"))
 
+    # O botão lê a área de transferência direto. Nela está o que Copiar para o SEI acabou
+    # de gravar, e o resultado volta com a mesma classe
+    selecao = pagina.evaluate("() => numeroDaSelecao")
+    pagina.click("#btn-colar")
+    pagina.wait_for_function("antes => numeroDaSelecao > antes", arg=selecao, timeout=PRAZO_CONVERSAO_MS)
+    _resultado_com(pagina, 'class="Texto_Ementa">Ementa colada.')
+    assert pagina.locator("#colar-painel").is_hidden()
+
     # O botão Copiar dos chats de IA entrega só texto simples, com as marcas do Markdown
     pagina.evaluate(COLAR, ["body", {"text/plain": "## 1. ASSUNTO\n\nTexto com **negrito**."}])
     _resultado_com(pagina, 'class="Item_Nivel1"')
@@ -441,7 +449,8 @@ def test_texto_colado_converte_como_um_arquivo(contexto: object, endereco: str) 
     pagina.evaluate(COLAR, ["#opt-max-kb", {"text/plain": "20"}])
     assert pagina.evaluate("() => numeroDaSelecao") == selecao
 
-    # No celular, o botão abre o campo, e colar nele converte e o fecha
+    # Sem a leitura liberada, o botão abre o campo, e colar nele converte e o fecha
+    pagina.evaluate("() => { navigator.clipboard.read = () => Promise.reject(new DOMException('', 'NotAllowedError')); }")
     pagina.click("#btn-colar")
     pagina.locator("#colar-campo").wait_for(state="visible")
     assert pagina.evaluate("() => document.activeElement.id") == "colar-campo"

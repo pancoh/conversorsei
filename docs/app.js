@@ -577,16 +577,55 @@ document.addEventListener('paste', (e) => {
   novaSelecao([colado]);
 });
 
-// No celular não há Ctrl+V: o botão abre um campo, e colar nele (tocar e segurar)
-// converte na hora. O botão Converter só aparece para o texto digitado
-btnColar.addEventListener('click', (e) => {
+// O botão lê a área de transferência direto. Cada navegador pede uma confirmação: o
+// Chrome, a permissão na primeira vez; o Safari e o Firefox, um toque em "Colar" a cada
+// leitura. Recusada ou sem o recurso, o botão abre um campo, e colar nele (Ctrl+V, ou
+// tocar e segurar no celular) converte na hora. O Converter do campo é para o texto digitado
+btnColar.addEventListener('click', async (e) => {
   e.preventDefault();
   if (!isPyodideReady) {
     showToast('Aguarde o conversor terminar de carregar.');
     return;
   }
-  mostrarCampoDeColar(colarPainel.classList.contains('hidden'));
+  if (!colarPainel.classList.contains('hidden')) {
+    mostrarCampoDeColar(false);
+    return;
+  }
+  let colado;
+  try {
+    colado = await lerAreaDeTransferencia();
+  } catch {
+    // Permissão negada, bolha "Colar" dispensada ou navegador sem o recurso
+    mostrarCampoDeColar(true);
+    return;
+  }
+  if (colado) {
+    novaSelecao([colado]);
+  } else {
+    showToast('A área de transferência não tem texto para converter.');
+  }
 });
+
+// As formas de texto do que foi copiado, no formato que arquivoDoConteudoColado lê
+async function lerAreaDeTransferencia() {
+  const valores = {};
+  if (navigator.clipboard && navigator.clipboard.read) {
+    for (const item of await navigator.clipboard.read()) {
+      for (const tipo of ['text/html', 'text/plain']) {
+        if (item.types.includes(tipo) && !valores[tipo]) valores[tipo] = await (await item.getType(tipo)).text();
+      }
+    }
+  } else if (navigator.clipboard && navigator.clipboard.readText) {
+    valores['text/plain'] = await navigator.clipboard.readText();
+  } else {
+    throw new Error('Leitura da área de transferência indisponível.');
+  }
+  return arquivoDoConteudoColado(comoDadosColados(valores));
+}
+
+function comoDadosColados(valores) {
+  return { getData: tipo => valores[tipo] || '' };
+}
 
 function mostrarCampoDeColar(mostrar) {
   colarPainel.classList.toggle('hidden', !mostrar);
@@ -601,9 +640,7 @@ colarCampo.addEventListener('input', () => {
 });
 
 btnColarConverter.addEventListener('click', () => {
-  const dados = new DataTransfer();
-  dados.setData('text/plain', colarCampo.value);
-  const colado = arquivoDoConteudoColado(dados);
+  const colado = arquivoDoConteudoColado(comoDadosColados({ 'text/plain': colarCampo.value }));
   if (colado) novaSelecao([colado]);
 });
 
