@@ -113,6 +113,7 @@ def extrair_blocos_de_fonte(
     max_nivel: int = 4,
     citacao: CitacaoPorRecuo | None = None,
     avisos: list[str] | None = None,
+    colado: bool = False,
 ) -> list[str]:
     """Extrai os blocos SEI de um documento, pelo formato indicado no sufixo.
 
@@ -132,7 +133,7 @@ def extrair_blocos_de_fonte(
     elif sufixo == ".odt":
         return converter_odt_para_blocos(fonte, max_nivel=max_nivel, citacao=citacao, avisos=avisos)
     elif sufixo in EXTENSOES_HTML:
-        return converter_html_para_blocos(fonte, max_nivel=max_nivel, avisos=avisos)
+        return converter_html_para_blocos(fonte, max_nivel=max_nivel, avisos=avisos, colado=colado)
     elif sufixo in FORMATOS_RETIRADOS:
         raise ValueError(FORMATOS_RETIRADOS[sufixo])
     else:
@@ -371,6 +372,7 @@ def converter_bytes(
     citacao_por_recuo: bool = False,
     omitir_cabecalho: bool = False,
     texto_reconhecido: str | None = None,
+    colado: bool = False,
 ) -> ResultadoMemoria:
     """Converte o conteúdo de um documento sem tocar no disco.
 
@@ -382,6 +384,10 @@ def converter_bytes(
     `texto_reconhecido` é o texto que o OCR do navegador leu de um PDF digitalizado.
     Com ele, o PDF não é lido de novo (não teria o que extrair): o texto segue a
     limpeza e a estruturação do PDF com texto, e o resultado leva o aviso do OCR.
+
+    `colado` indica conteúdo colado na página, e não um arquivo: a área de transferência
+    do Word e do Google Docs traz a formatação que o leitor de HTML entende, e o aviso
+    para converter o arquivo original não cabe.
     """
     origem = Path(nome_arquivo)
     resultado = ResultadoMemoria(nome_origem=origem.name)
@@ -402,7 +408,7 @@ def converter_bytes(
         else:
             with closing(StreamNomeado(conteudo, origem.name)) as fonte:
                 blocos = extrair_blocos_de_fonte(
-                    fonte, origem.suffix, max_nivel=max_nivel, citacao=citacao, avisos=avisos_extracao
+                    fonte, origem.suffix, max_nivel=max_nivel, citacao=citacao, avisos=avisos_extracao, colado=colado
                 )
     except Exception as e:
         resultado.sucesso = False

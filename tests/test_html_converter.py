@@ -226,3 +226,26 @@ def test_saida_pedida_pelo_nome_ainda_e_convertida(tmp_path):
     saida.write_text('<p class="Item_Nivel1">ASSUNTO</p>', encoding="utf-8")
     res = converter_documento(saida, outdir=tmp_path / "outra")
     assert res.sucesso, res.erros
+
+
+def test_texto_colado_do_word_nao_pede_o_docx():
+    """Colado, o HTML do Word traz a formatação no texto: o aviso de arquivo não vale."""
+    pagina = '<html xmlns:w="urn:schemas-microsoft-com:office:word"><body><p class=MsoNormal>Texto.</p></body></html>'
+    res = converter_documento_memoria(nome_arquivo="texto_colado.html", conteudo_bytes=pagina.encode(), colado=True)
+    assert res["sucesso"] is True, res["erros"]
+    assert res["avisos"] == []
+
+
+def test_copia_do_google_docs_nao_recebe_o_aviso_da_exportacao():
+    """A cópia (docs-internal-guid) traz a ênfase no style, que é lido."""
+    avisos: list[str] = []
+    _markdown('<b id="docs-internal-guid-1" style="font-weight:normal"><p>Texto.</p></b>', avisos)
+    assert avisos == []
+
+
+def test_colado_sem_texto_explica_sem_citar_arquivo():
+    res = converter_documento_memoria(
+        nome_arquivo="texto_colado.html", conteudo_bytes=b'<img src="x.png">', colado=True
+    )
+    assert res["sucesso"] is False
+    assert "conteúdo colado" in res["erros"][0]

@@ -4,6 +4,8 @@ let pyodideInstance = null;
 let isPyodideReady = false;
 let currentResultFiles = [];
 let currentOriginalName = '';
+// O resultado na tela veio de um texto colado, e não de um arquivo
+let origemColada = false;
 let emLote = false;
 // Arquivos da última seleção, para converter de novo quando a opção de citação muda
 let ultimosArquivos = [];
@@ -43,6 +45,10 @@ const dropDetalhes = ['drop-icone', 'drop-formatos', 'drop-ajuda'].map(id => doc
 const btnSelecionar = document.getElementById('btn-selecionar');
 const btnSelecionarTexto = document.getElementById('btn-selecionar-texto');
 const dropConteudo = document.getElementById('drop-conteudo');
+const btnColar = document.getElementById('btn-colar');
+const colarPainel = document.getElementById('colar-painel');
+const colarCampo = document.getElementById('colar-campo');
+const btnColarConverter = document.getElementById('btn-colar-converter');
 
 const toggleOptionsBtn = document.getElementById('toggle-options-btn');
 const optionsPanel = document.getElementById('options-panel');
@@ -208,7 +214,10 @@ function versaoDaPagina() {
 }
 
 function linkDoRelato() {
-  const formatos = [...new Set(ultimosArquivos.map(f => (f.name.match(/\.[^.]+$/) || ['sem extensão'])[0].toLowerCase()))];
+  const formatos = [...new Set(ultimosArquivos.map(f => {
+    const extensao = (f.name.match(/\.[^.]+$/) || ['sem extensão'])[0].toLowerCase();
+    return f.colado ? `colado (${extensao})` : extensao;
+  }))];
   const { situacao, detalhes } = contextoDoRelato;
   const linhas = detalhes.slice(0, MAXIMO_LINHAS_DO_RELATO).map(d => `- ${semNomesDeArquivo(d)}`);
   if (detalhes.length > MAXIMO_LINHAS_DO_RELATO) linhas.push(`- e mais ${detalhes.length - MAXIMO_LINHAS_DO_RELATO}.`);
@@ -464,8 +473,11 @@ print("conversorsei pronto versão:", conversorsei.__version__)
 // ativo e só respondia com um aviso rápido, que passava despercebido
 function definirEnvioDisponivel(disponivel) {
   fileInput.disabled = !disponivel;
-  btnSelecionar.classList.toggle('opacity-60', !disponivel);
-  btnSelecionar.classList.toggle('cursor-wait', !disponivel);
+  btnColar.disabled = !disponivel;
+  [btnSelecionar, btnColar].forEach(botao => {
+    botao.classList.toggle('opacity-60', !disponivel);
+    botao.classList.toggle('cursor-wait', !disponivel);
+  });
   btnSelecionarTexto.textContent = disponivel ? 'Selecionar arquivos' : 'Carregando o conversor...';
 }
 
@@ -512,8 +524,93 @@ dropZone.addEventListener('drop', (e) => {
   const files = dt.files;
   if (files.length > 0) {
     novaSelecao(Array.from(files));
+    return;
   }
+  // Texto selecionado e arrastado de outra janela segue o caminho do texto colado
+  const colado = arquivoDoConteudoColado(dt);
+  if (colado) novaSelecao([colado]);
 });
+
+// Texto colado. A área de transferência traz o mesmo conteúdo em mais de uma forma: o
+// HTML formatado (Word, Google Docs, LibreOffice, o SEI, texto selecionado num chat) vai
+// ao leitor de HTML; o texto simples com marcas de Markdown (o botão Copiar dos chats de
+// IA), ao de Markdown; o resto, ao de texto. O conteúdo vira um arquivo e segue o caminho
+// de qualquer outro, com a marca `colado`, que tira os avisos próprios de arquivo
+const ESTRUTURA_HTML = /<(p|h[1-6]|li|table|blockquote|pre)[\s>]/i;
+const MARCAS_MARKDOWN = /^\s{0,3}(#{1,6}\s|[-*+]\s|>|\|.*\|\s*$|```)|\*\*\S|\[[^\]]+\]\([^)\s]+\)/m;
+
+function arquivoDoConteudoColado(dados) {
+  const html = dados.getData('text/html') || '';
+  const texto = dados.getData('text/plain') || '';
+  let nome, conteudo, tipo;
+  if (html && ESTRUTURA_HTML.test(html)) {
+    [nome, conteudo, tipo] = ['texto_colado.html', html, 'text/html'];
+  } else if (texto.trim()) {
+    const markdown = MARCAS_MARKDOWN.test(texto);
+    [nome, conteudo, tipo] = [markdown ? 'texto_colado.md' : 'texto_colado.txt', texto, 'text/plain'];
+  } else if (html.trim()) {
+    [nome, conteudo, tipo] = ['texto_colado.html', html, 'text/html'];
+  } else {
+    return null;
+  }
+  const arquivo = new File([conteudo], nome, { type: tipo });
+  arquivo.colado = true;
+  return arquivo;
+}
+
+// Ctrl+V em qualquer ponto da página converte o que foi colado. Num campo de texto da
+// página (as opções), colar é colar, menos no campo feito para isso
+document.addEventListener('paste', (e) => {
+  const alvo = e.target;
+  const editavel = alvo instanceof HTMLElement && (alvo.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(alvo.tagName));
+  if (editavel && alvo !== colarCampo) return;
+  e.preventDefault();
+  if (!isPyodideReady) {
+    showToast('Aguarde o conversor terminar de carregar.');
+    return;
+  }
+  const colado = e.clipboardData && arquivoDoConteudoColado(e.clipboardData);
+  if (!colado) {
+    showToast('A área de transferência não tem texto para converter.');
+    return;
+  }
+  novaSelecao([colado]);
+});
+
+// No celular não há Ctrl+V: o botão abre um campo, e colar nele (tocar e segurar)
+// converte na hora. O botão Converter só aparece para o texto digitado
+btnColar.addEventListener('click', (e) => {
+  e.preventDefault();
+  if (!isPyodideReady) {
+    showToast('Aguarde o conversor terminar de carregar.');
+    return;
+  }
+  mostrarCampoDeColar(colarPainel.classList.contains('hidden'));
+});
+
+function mostrarCampoDeColar(mostrar) {
+  colarPainel.classList.toggle('hidden', !mostrar);
+  btnColar.setAttribute('aria-expanded', String(mostrar));
+  colarCampo.value = '';
+  btnColarConverter.classList.add('hidden');
+  if (mostrar) colarCampo.focus();
+}
+
+colarCampo.addEventListener('input', () => {
+  btnColarConverter.classList.toggle('hidden', !colarCampo.value.trim());
+});
+
+btnColarConverter.addEventListener('click', () => {
+  const dados = new DataTransfer();
+  dados.setData('text/plain', colarCampo.value);
+  const colado = arquivoDoConteudoColado(dados);
+  if (colado) novaSelecao([colado]);
+});
+
+// No Mac, o atalho é Cmd+V
+if (/Mac/.test(navigator.platform || navigator.userAgent)) {
+  document.querySelectorAll('[data-atalho-colar]').forEach(el => { el.textContent = 'Cmd+V'; });
+}
 
 fileInput.addEventListener('change', (e) => {
   if (e.target.files.length > 0) {
@@ -529,6 +626,7 @@ function novaSelecao(files) {
   citacaoPorRecuo = false;
   omitirCabecalho = false;
   resAjustes.open = false;
+  mostrarCampoDeColar(false);
   processFiles(files);
 }
 
@@ -591,6 +689,7 @@ async function processFiles(files) {
 
   const startTime = performance.now();
   emLote = true;
+  origemColada = false;
   currentOriginalName = `${files.length} documentos`;
 
   const gerados = [];
@@ -984,6 +1083,7 @@ async function converterArquivo(file, opcoes) {
     const argCabecalho = opcoes.omitirCabecalho ? '\n    omitir_cabecalho=True,' : '';
     if (textoReconhecido !== undefined) pyodideInstance.globals.set('temp_texto_reconhecido', textoReconhecido);
     const argOcr = textoReconhecido !== undefined ? '\n    texto_reconhecido=temp_texto_reconhecido,' : '';
+    const argColado = file.colado ? '\n    colado=True,' : '';
 
     const jsonStr = await pyodideInstance.runPythonAsync(`
 import conversorsei.web
@@ -996,7 +1096,7 @@ res_json = conversorsei.web.converter_memoria_json(
     so_corpo=False,
     forcar_unico=bool(temp_forcar_unico),
     max_kb=int(temp_max_kb),
-    validar=True,${argCitacao}${argCabecalho}${argOcr}
+    validar=True,${argCitacao}${argCabecalho}${argOcr}${argColado}
 )
 # Sem isto o documento inteiro fica preso no dicionário global do Python até a
 # conversão seguinte, o que pesa no modo em lote
@@ -1006,7 +1106,7 @@ res_json
 `);
 
     const resultado = JSON.parse(jsonStr);
-    registrarConversao(file.name, resultado.sucesso);
+    registrarConversao(file, resultado.sucesso);
     return resultado;
   });
 }
@@ -1014,14 +1114,16 @@ res_json
 // Conta a conversão no GoatCounter como evento. Vai só a extensão e o desfecho, nunca o
 // nome do arquivo, que pode identificar o processo. Sem rede ou com o contador bloqueado,
 // window.goatcounter não existe e a conversão segue sem contar.
-function registrarConversao(nomeArquivo, sucesso) {
+function registrarConversao(file, sucesso) {
   if (!window.goatcounter || typeof window.goatcounter.count !== 'function') return;
-  const ponto = nomeArquivo.lastIndexOf('.');
-  const extensao = ponto >= 0 ? nomeArquivo.slice(ponto + 1).toLowerCase() : 'sem-extensao';
+  const ponto = file.name.lastIndexOf('.');
+  let extensao = ponto >= 0 ? file.name.slice(ponto + 1).toLowerCase() : 'sem-extensao';
+  // O texto colado conta à parte, pela forma em que chegou
+  if (file.colado) extensao = `colado-${extensao}`;
   try {
     window.goatcounter.count({
       path: `conversao-${extensao}${sucesso ? '' : '-falha'}`,
-      title: `Conversão de .${extensao}`,
+      title: file.colado ? `Conversão de texto colado (${extensao.slice(7)})` : `Conversão de .${extensao}`,
       event: true,
     });
   } catch {
@@ -1037,9 +1139,11 @@ async function processFile(file, selecao, opcoes) {
   }
 
   emLote = false;
+  origemColada = Boolean(file.colado);
   currentOriginalName = file.name;
+  const nomeNaTela = origemColada ? 'Texto colado' : file.name;
   const startTime = performance.now();
-  mostrarStatusProcessando(`Convertendo ${file.name}...`);
+  mostrarStatusProcessando(origemColada ? 'Convertendo o texto colado...' : `Convertendo ${file.name}...`);
 
   try {
     const result = await converterArquivo(file, opcoes);
@@ -1053,12 +1157,12 @@ async function processFile(file, selecao, opcoes) {
     currentResultFiles = result.arquivos;
     renderResults(result, elapsedSeconds);
     const partes = result.arquivos.length === 1 ? 'em arquivo único' : `em ${result.arquivos.length} partes`;
-    mostrarStatusSoParaLeitorDeTela(`${file.name} convertido em ${formatarSegundos(elapsedSeconds)}, ${partes}.`);
+    mostrarStatusSoParaLeitorDeTela(`${nomeNaTela} convertido em ${formatarSegundos(elapsedSeconds)}, ${partes}.`);
   } catch (err) {
     if (selecao !== numeroDaSelecao) return false;
     console.error('Erro na conversão:', err);
     ocultarResultado();
-    mostrarStatusErro('Erro ao converter documento', err.message);
+    mostrarStatusErro(origemColada ? 'Erro ao converter o texto colado' : 'Erro ao converter documento', err.message);
     return false;
   }
   return true;
@@ -1147,7 +1251,8 @@ function situacaoDoLimite(arq, limiteKb) {
 // uma faixa e deixa de empurrar o resultado para baixo. Arrastar continua valendo
 function compactarAreaDeEnvio() {
   dropDetalhes.forEach(el => el.classList.add('hidden'));
-  dropConteudo.classList.add('sm:flex', 'sm:items-center', 'sm:justify-center', 'sm:gap-4', 'sm:space-y-0');
+  // Sem o limite de largura: título e os dois botões cabem numa linha só
+  dropConteudo.classList.add('sm:flex', 'sm:items-center', 'sm:justify-center', 'sm:gap-4', 'sm:space-y-0', 'sm:max-w-none');
   dropZone.classList.remove('p-6', 'sm:p-8');
   dropZone.classList.add('p-4');
   dropTitulo.textContent = 'Converter outro documento';
@@ -1190,7 +1295,7 @@ function renderResults(result, segundos) {
     pyodideStatusCard.after(resultsSection);
   }
   resultsSection.classList.remove('hidden');
-  resFilename.textContent = currentOriginalName;
+  resFilename.textContent = origemColada ? 'Texto colado' : currentOriginalName;
   
   const totalPartes = result.arquivos.length;
   if (totalPartes === 1) {

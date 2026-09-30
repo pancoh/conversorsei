@@ -394,6 +394,69 @@ PAGINA_DIGITALIZADA = """<!doctype html><html><body style="margin:0;background:#
 </div></body></html>"""
 
 
+# Colagem simulada: o Playwright não escreve text/html na área de transferência de todos
+# os navegadores, então o evento de colar é disparado com os dados prontos
+COLAR = """([seletor, dados]) => {
+  const transferencia = new DataTransfer();
+  for (const [tipo, valor] of Object.entries(dados)) transferencia.setData(tipo, valor);
+  document.querySelector(seletor).dispatchEvent(
+    new ClipboardEvent('paste', { clipboardData: transferencia, bubbles: true, cancelable: true })
+  );
+}"""
+
+
+def _resultado_com(pagina: object, trecho: str) -> None:
+    pagina.wait_for_function(  # type: ignore[attr-defined]
+        "trecho => currentResultFiles.some(arq => arq.conteudo.includes(trecho))", arg=trecho,
+        timeout=PRAZO_CONVERSAO_MS,
+    )
+
+
+def test_texto_colado_converte_como_um_arquivo(contexto: object, endereco: str) -> None:
+    pagina = contexto.new_page()  # type: ignore[attr-defined]
+    erros: list[str] = []
+    pagina.on("pageerror", lambda erro: erros.append(str(erro)))
+    pagina.goto(endereco)
+    _esperar_conversor(pagina)
+
+    # HTML de um editor, colado em qualquer ponto da página: vai ao leitor de HTML
+    pagina.evaluate(
+        COLAR,
+        ["body", {"text/html": '<p class="Texto_Ementa">Ementa colada.</p><p>Texto.</p>',
+                  "text/plain": "Ementa colada.\nTexto."}],
+    )
+    pagina.locator("#res-filename", has_text="Texto colado").wait_for(timeout=PRAZO_CONVERSAO_MS)
+    assert "texto_colado_SEI.html" in pagina.locator("#res-parts-list").inner_text()
+    copiado = _copiar(pagina)
+    assert 'class="Texto_Ementa"' in copiado and "Ementa colada." in copiado
+    assert "Formato: colado (.html)" in unquote(pagina.evaluate("() => linkDoRelato()"))
+
+    # O botão Copiar dos chats de IA entrega só texto simples, com as marcas do Markdown
+    pagina.evaluate(COLAR, ["body", {"text/plain": "## 1. ASSUNTO\n\nTexto com **negrito**."}])
+    _resultado_com(pagina, 'class="Item_Nivel1"')
+    _resultado_com(pagina, "<strong>negrito</strong>")
+
+    # Colar num campo das opções é só colar: não converte
+    selecao = pagina.evaluate("() => numeroDaSelecao")
+    pagina.evaluate(COLAR, ["#opt-max-kb", {"text/plain": "20"}])
+    assert pagina.evaluate("() => numeroDaSelecao") == selecao
+
+    # No celular, o botão abre o campo, e colar nele converte e o fecha
+    pagina.click("#btn-colar")
+    pagina.locator("#colar-campo").wait_for(state="visible")
+    assert pagina.evaluate("() => document.activeElement.id") == "colar-campo"
+    pagina.evaluate(COLAR, ["#colar-campo", {"text/plain": "Colado no campo."}])
+    _resultado_com(pagina, "Colado no campo.")
+    assert pagina.locator("#colar-painel").is_hidden()
+
+    # Texto digitado no campo converte pelo botão
+    pagina.click("#btn-colar")
+    pagina.fill("#colar-campo", "Digitado no campo.")
+    pagina.click("#btn-colar-converter")
+    _resultado_com(pagina, "Digitado no campo.")
+    assert not erros, erros
+
+
 def _pdf_de_imagem(jpeg: bytes, largura: int, altura: int) -> bytes:
     """PDF de uma página A4 que só tem uma imagem JPEG, como um documento digitalizado."""
     conteudo = b"q 595 0 0 842 0 0 cm /Im0 Do Q"

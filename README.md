@@ -81,6 +81,8 @@ original antes de salvar no SEI.
 
 1. Abra [conversorsei.com.br](https://conversorsei.com.br/).
 2. Arraste o documento para a página ou clique para escolher o arquivo.
+   Também dá para colar o texto copiado de um chat de IA ou de qualquer editor: aperte `Ctrl+V`
+   na página (no Mac, `Cmd+V`) ou clique em **Colar texto**.
 3. Clique em **Copiar para o SEI**.
 4. No SEI, abra o editor, clique no corpo do documento e cole com `Ctrl+V` (no Mac, `Cmd+V`).
 5. Confira o resultado, principalmente a numeração, as tabelas e as imagens, e salve.

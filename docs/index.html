@@ -17,7 +17,7 @@
   <!-- Bibliotecas servidas localmente (vendor/), com versão fixa e sem depender de CDN de terceiros -->
   <!-- O ?v= é a marca de versão do conteúdo, gravada por scripts/bundle_web.py: cada versão
        tem um endereço próprio, e nenhum cache entrega o HTML novo com o CSS ou o app.js antigo -->
-  <link href="estilos.css?v=7437365de8" rel="stylesheet">
+  <link href="estilos.css?v=086ba648f9" rel="stylesheet">
   <link href="vendor/fonts.css" rel="stylesheet">
   <script src="vendor/lucide-1.33.0.min.js"></script>
   <script src="vendor/jszip-3.10.1.min.js"></script>
@@ -139,14 +139,37 @@
         <p id="drop-titulo" class="hidden sm:block text-base font-semibold text-slate-800">Arraste os arquivos para cá</p>
 
         <!-- Desativado até o conversor carregar (ver definirEnvioDisponivel em app.js) -->
-        <span id="btn-selecionar" class="inline-flex items-center justify-center gap-2 px-5 py-3 bg-blue-700 hover:bg-blue-800 active:bg-blue-800 text-white font-semibold rounded-lg text-sm transition-colors w-full sm:w-auto opacity-60 cursor-wait">
+        <div class="flex flex-col sm:flex-row sm:justify-center gap-3">
+        <span id="btn-selecionar" class="inline-flex items-center justify-center gap-2 px-5 py-3 bg-blue-700 hover:bg-blue-800 active:bg-blue-800 text-white font-semibold rounded-lg text-sm whitespace-nowrap transition-colors w-full sm:w-auto opacity-60 cursor-wait">
           <i data-lucide="file-up" class="w-4 h-4"></i>
           <span id="btn-selecionar-texto">Carregando o conversor...</span>
         </span>
 
-        <p id="drop-formatos" class="text-sm text-slate-600">DOCX, PDF, ODT, HTML, MD e TXT. Você pode selecionar vários arquivos.</p>
+        <!-- Um botão dentro do label não abre a escolha de arquivos: é conteúdo interativo -->
+        <button id="btn-colar" type="button" aria-expanded="false" aria-controls="colar-painel" disabled
+          class="inline-flex items-center justify-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-300 font-semibold rounded-lg text-sm whitespace-nowrap transition-colors w-full sm:w-auto opacity-60 cursor-wait">
+          <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
+          <span>Colar texto</span>
+        </button>
+        </div>
+
+        <p id="drop-formatos" class="text-sm text-slate-600">DOCX, PDF, ODT, HTML, MD e TXT. Você pode selecionar vários arquivos<span class="hidden sm:inline"> ou colar o texto (<span data-atalho-colar>Ctrl+V</span>)</span>.</p>
       </div>
       </label>
+
+      <!-- Campo para colar no celular, onde não há Ctrl+V. A conversão começa ao colar -->
+      <div id="colar-painel" class="hidden bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+        <label for="colar-campo" class="block text-sm font-semibold text-slate-800">Cole o texto aqui</label>
+        <textarea id="colar-campo" rows="4"
+          class="block w-full border border-slate-300 rounded-lg p-3 text-sm text-slate-800 bg-white"
+          placeholder="Texto de um chat de IA, do Word, do Google Docs ou de qualquer editor"></textarea>
+        <p class="text-xs text-slate-500"><span class="hidden sm:inline">Use <span data-atalho-colar>Ctrl+V</span>. </span><span class="sm:hidden">Toque e segure no campo e escolha Colar. </span>O texto também não sai do navegador.</p>
+        <!-- Para o texto digitado ou trazido sem o evento de colar -->
+        <button id="btn-colar-converter" type="button"
+          class="hidden inline-flex items-center justify-center gap-2 px-5 py-3 bg-blue-700 hover:bg-blue-800 active:bg-blue-800 text-white font-semibold rounded-lg text-sm transition-colors w-full sm:w-auto">
+          Converter o texto
+        </button>
+      </div>
 
       <p id="drop-ajuda" class="text-xs text-slate-500 text-center">A conversão nesta página ocorre no navegador. O conversor não envia o documento a servidores.</p>
     </div>
@@ -421,7 +444,7 @@
   </footer>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=1078611287"></script>
+  <script src="app.js?v=67afac64a9"></script>
 
   <!-- Contagem de acessos, sem cookies. Fica fora do service worker: sem rede, a visita
        apenas não é contada, e a página continua abrindo -->

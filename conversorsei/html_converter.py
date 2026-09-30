@@ -101,7 +101,9 @@ RE_TEXTO_DO_SEI = re.compile(
 RE_HTML_DO_WORD = re.compile(
     r"urn:schemas-microsoft-com:office:word|<meta[^>]+content=[\"']?Microsoft Word", re.IGNORECASE
 )
-RE_HTML_DO_GOOGLE_DOCS = re.compile(r"docs-internal-guid|<body[^>]+class=\"[^\"]*\bdoc-content\b", re.IGNORECASE)
+# O arquivo exportado, e não a cópia: na cópia (marca docs-internal-guid), a ênfase vem no
+# style de cada trecho, que é lido
+RE_HTML_DO_GOOGLE_DOCS = re.compile(r"<body[^>]+class=\"[^\"]*\bdoc-content\b", re.IGNORECASE)
 
 
 @dataclass(eq=False)
@@ -518,21 +520,29 @@ class LeitorHtml:
         return re.sub(r"\n{3,}", "\n\n", "\n".join(self.linhas)).strip()
 
 
-def extrair_markdown_html(fonte: FonteDocumento, avisos: list[str] | None = None) -> str:
-    """Extrai o conteúdo de um .html como Markdown."""
+def extrair_markdown_html(fonte: FonteDocumento, avisos: list[str] | None = None, colado: bool = False) -> str:
+    """Extrai o conteúdo de um .html como Markdown.
+
+    `colado` indica o HTML da área de transferência, e não um arquivo salvo: ali, o
+    Word e o Google Docs põem a formatação no próprio texto, e o aviso para converter o
+    .docx não vale.
+    """
     nome = nome_da_fonte(fonte, "documento.html")
     texto = decodificar_html(ler_bytes(fonte), avisos)
     leitor = LeitorHtml()
     markdown = leitor.markdown(montar_arvore(texto))
     if not markdown:
+        if colado:
+            raise RuntimeError("Nenhum texto foi encontrado no conteúdo colado.")
         raise RuntimeError(f"Nenhum texto foi encontrado em {nome}: a página pode estar vazia ou conter apenas imagens.")
     if avisos is not None:
-        if RE_HTML_DO_WORD.search(texto[:5000]):
+        # Na área de transferência, o Word e o Google Docs trazem a formatação no texto
+        if not colado and RE_HTML_DO_WORD.search(texto[:5000]):
             avisos.append(
                 "Este HTML foi salvo pelo Word, que não guarda ali a numeração e os estilos do documento. "
                 "Se tiver o original, converta o .docx."
             )
-        elif RE_HTML_DO_GOOGLE_DOCS.search(texto[:20000]):
+        elif not colado and RE_HTML_DO_GOOGLE_DOCS.search(texto[:20000]):
             avisos.append(
                 "Este HTML veio do Google Docs, que marca negrito e itálico de um jeito que não foi lido. "
                 "Para manter a formatação, baixe o documento como .docx (Arquivo, Fazer download, "
@@ -551,12 +561,12 @@ def extrair_markdown_html(fonte: FonteDocumento, avisos: list[str] | None = None
 
 
 def converter_html_para_blocos(
-    fonte: FonteDocumento, max_nivel: int = 4, avisos: list[str] | None = None
+    fonte: FonteDocumento, max_nivel: int = 4, avisos: list[str] | None = None, colado: bool = False
 ) -> list[str]:
     """Converte um arquivo HTML para blocos HTML SEI.
 
     O Markdown vem com a semântica do .md, e não a do texto extraído de ODT e PDF: o
     <h1> sem número é o título do documento, como o "#" num .md.
     """
-    markdown = extrair_markdown_html(fonte, avisos=avisos)
+    markdown = extrair_markdown_html(fonte, avisos=avisos, colado=colado)
     return converter_texto_md_para_blocos(markdown, max_nivel=max_nivel)
