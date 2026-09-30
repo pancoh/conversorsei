@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Conversor SEI — DOCX, PDF, ODT e Markdown para o padrão SEI</title>
-  <meta name="description" content="Conversor de documentos DOCX, PDF, ODT e Markdown para o HTML institucional do SEI, com divisão automática em partes. A conversão é feita no navegador, sem enviar o documento." />
+  <title>Conversor SEI — DOCX, PDF, ODT, HTML e Markdown para o padrão SEI</title>
+  <meta name="description" content="Conversor de documentos DOCX, PDF, ODT, HTML e Markdown para o HTML institucional do SEI, com divisão automática em partes. A conversão é feita no navegador, sem enviar o documento." />
   
   <!-- Aplicativo instalável: com o service worker, abre e converte sem rede após a primeira visita -->
   <link rel="manifest" href="manifest.webmanifest">
@@ -125,7 +125,7 @@
         type="file" 
         id="file-input" 
         class="sr-only" 
-        accept=".docx,.pdf,.odt,.md,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,text/plain,text/markdown" 
+        accept=".docx,.pdf,.odt,.html,.htm,.md,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.oasis.opendocument.text,text/html,text/plain,text/markdown" 
         multiple 
         disabled
       />
@@ -144,7 +144,7 @@
           <span id="btn-selecionar-texto">Carregando o conversor...</span>
         </span>
 
-        <p id="drop-formatos" class="text-sm text-slate-600">DOCX, PDF, ODT, MD e TXT. Você pode selecionar vários arquivos.</p>
+        <p id="drop-formatos" class="text-sm text-slate-600">DOCX, PDF, ODT, HTML, MD e TXT. Você pode selecionar vários arquivos.</p>
       </div>
       </label>
 

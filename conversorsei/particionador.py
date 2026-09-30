@@ -11,6 +11,9 @@ from conversorsei.recursos import obter_estilos_sei
 
 # Limite em bytes a partir do qual o plugin SEI Pro perde estilos ao colar
 LIMITE_SEI_BYTES = 27_000
+# Título de todo HTML gerado. A varredura de pastas o procura para não converter de novo
+# a própria saída, que agora é um formato de entrada
+TITULO_DA_SAIDA = "Conteúdo formatado para o SEI"
 MAX_KB_PADRAO = 22
 # 1 KB = 1.000 bytes em todo o projeto, para o tamanho exibido bater com o limite aplicado
 BYTES_POR_KB = 1000
@@ -95,7 +98,7 @@ def montar_html(corpo_html: str, css: str | None = None, contadores: dict[str, i
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>Conteúdo formatado para o SEI</title>
+<title>{TITULO_DA_SAIDA}</title>
 <style>
 body {{font-family:Calibri, sans-serif; font-size:12pt; color:#000; background:#fff;
       max-width:19cm; margin:1.5em auto; padding:0 1em;}}

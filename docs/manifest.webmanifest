@@ -1,7 +1,7 @@
 {
   "name": "Conversor SEI",
   "short_name": "Conversor SEI",
-  "description": "Converte documentos Word, PDF, LibreOffice, Markdown e texto para o padrão do editor do SEI. Todo o processamento acontece na própria máquina.",
+  "description": "Converte documentos Word, PDF, LibreOffice, HTML, Markdown e texto para o padrão do editor do SEI. Todo o processamento acontece na própria máquina.",
   "lang": "pt-BR",
   "dir": "ltr",
   "start_url": ".",

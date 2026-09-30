@@ -141,6 +141,12 @@ def _esperar_conversor(pagina: object) -> None:
     )
 
 
+PAGINA_HTML = (
+    b'<html><head><title>Aba</title></head><body><script>alert(1)</script>'
+    b'<p class="Texto_Ementa">Ementa lida de HTML.</p><p>Texto.</body></html>'
+)
+
+
 def _enviar(pagina: object) -> None:
     pagina.set_input_files(  # type: ignore[attr-defined]
         "#file-input", files=[{"name": "nota.md", "mimeType": "text/markdown", "buffer": NOTA}]
@@ -269,6 +275,16 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     _enviar(pagina)
     pagina.locator("#status-ocr-iniciar").wait_for(state="hidden", timeout=PRAZO_CONVERSAO_MS)
     pagina.locator("#status-relato").wait_for(state="hidden", timeout=PRAZO_CONVERSAO_MS)
+
+    # HTML converte no navegador pelo html.parser do Pyodide, com a classe do SEI intacta
+    pagina.set_input_files(
+        "#file-input",
+        files=[{"name": "pagina.html", "mimeType": "text/html", "buffer": PAGINA_HTML}],
+    )
+    pagina.locator("#res-parts-list", has_text="pagina_SEI.html").wait_for(timeout=PRAZO_CONVERSAO_MS)
+    copiado = _copiar(pagina)
+    assert 'class="Texto_Ementa"' in copiado and "Ementa lida de HTML." in copiado
+    assert "alert" not in copiado
 
     # O service worker precisa ter guardado o Pyodide, e não só o cache HTTP do navegador,
     # que pode ser descartado a qualquer momento

@@ -67,6 +67,7 @@ do SEI e você cola o resultado pronto no editor.
 | `.docx` | Microsoft Word |
 | `.odt` | LibreOffice Writer |
 | `.pdf` | PDF com texto selecionável, inclusive os exportados pelo próprio SEI |
+| `.html` e `.htm` | Documento salvo do próprio SEI, páginas e sistemas |
 | `.md` e `.txt` | Texto simples |
 
 PDF digitalizado (uma foto da página) não tem texto para ler. Nesse caso, a página oferece o

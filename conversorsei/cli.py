@@ -168,7 +168,7 @@ def observar(args: argparse.Namespace, alvos: list[str], outdir: Path | None, va
 def criar_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="conversorsei",
-        description="Converte arquivos DOCX, PDF, ODT, MD e TXT em HTML no padrão institucional do editor SEI.",
+        description="Converte arquivos DOCX, PDF, ODT, HTML, MD e TXT em HTML no padrão institucional do editor SEI.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemplos de uso:
@@ -185,7 +185,7 @@ Exemplos de uso:
         "alvos",
         nargs="*",
         default=[],
-        help="Arquivos ou diretórios a converter (.docx, .pdf, .odt, .md, .txt). Se omitido, processa dados/entrada/.",
+        help="Arquivos ou diretórios a converter (.docx, .pdf, .odt, .html, .md, .txt). Se omitido, processa dados/entrada/.",
     )
     parser.add_argument(
         "-o",

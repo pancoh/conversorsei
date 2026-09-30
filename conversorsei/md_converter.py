@@ -535,6 +535,33 @@ def parse_table_markdown(lines: list[str], start_idx: int) -> tuple[list[list[st
     return table_data, idx
 
 
+# Classe de célula do SEI e a formatação que o docx_converter lê de volta como ela: numa
+# célula, a classe sai do alinhamento e da fonte, e não do nome do estilo
+FORMATO_DA_CELULA = {
+    "Tabela_Texto_Centralizado": (WD_ALIGN_PARAGRAPH.CENTER, None),
+    "Tabela_Texto_Alinhado_Direita": (WD_ALIGN_PARAGRAPH.RIGHT, None),
+    "Tabela_Texto_Alinhado_Esquerda": (WD_ALIGN_PARAGRAPH.LEFT, None),
+    "Tabela_Texto_10": (WD_ALIGN_PARAGRAPH.CENTER, 10),
+    "Tabela_Texto_8": (WD_ALIGN_PARAGRAPH.LEFT, 8),
+}
+
+
+def ajustar_celula_pela_classe(p, classe: str) -> None:
+    """Formata a célula escrita como <p class="Tabela_..."> para voltar com essa classe.
+
+    É o caminho do HTML do SEI, em que cada célula traz a classe. Classe que não é de
+    célula não muda nada.
+    """
+    formato = FORMATO_DA_CELULA.get(classe_sei_pelo_nome(classe) or "")
+    if not formato:
+        return
+    alinhamento, tamanho = formato
+    p.alignment = alinhamento
+    if tamanho:
+        for run in p.runs:
+            run.font.size = Pt(tamanho)
+
+
 def estilo_de_marcador(doc: DocumentoWord, nivel: int) -> str:
     """Nome do estilo de marcador do nível, criado quando o modelo não o tem.
 
@@ -698,7 +725,12 @@ def montar_docx_de_markdown(conteudo: str, estendido: bool = True, extraido: boo
                         if is_header:
                             definir_fundo_celula(cell, "E6E6E6")
                         p = cell.paragraphs[0]
+                        html_celula = html_paragraph_to_markdown(cell_text)
+                        if html_celula:
+                            classe_celula, cell_text = html_celula
                         format_paragraph(p, cell_text, is_heading=False, is_center=is_header)
+                        if html_celula:
+                            ajustar_celula_pela_classe(p, classe_celula)
                         coluna += largura
                     # Linhas incompletas ainda recebem a largura da tabela.
                     for c_idx in range(coluna, cols_cnt):

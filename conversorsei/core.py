@@ -15,10 +15,12 @@ from zipfile import BadZipFile
 from conversorsei.docx_converter import converter_docx_para_blocos
 from conversorsei.entrada import FonteDocumento, StreamNomeado
 from conversorsei.formatacao import CitacaoPorRecuo, trecho_inicial
+from conversorsei.html_converter import EXTENSOES_HTML, converter_html_para_blocos
 from conversorsei.md_converter import converter_md_para_blocos
 from conversorsei.odt_converter import converter_odt_para_blocos
 from conversorsei.particionador import (
     MAX_KB_PADRAO,
+    TITULO_DA_SAIDA,
     avancar_contadores,
     contadores_zerados,
     derivar_caminho_saida,
@@ -30,7 +32,7 @@ from conversorsei.particionador import (
 from conversorsei.pdf_converter import converter_pdf_para_blocos, converter_texto_de_pdf_para_blocos
 from conversorsei.validador import validar_html_sei
 
-EXTENSOES_SUPORTADAS = {".docx", ".pdf", ".md", ".txt", ".odt"}
+EXTENSOES_SUPORTADAS = {".docx", ".pdf", ".md", ".txt", ".odt", *EXTENSOES_HTML}
 # Formatos de editor que não são aceitos, com a orientação para quem ainda os usa. O .rtf
 # saiu em 2026-09: não havia uso conhecido, e o leitor próprio de RTF era o trecho mais
 # caro de manter. O .doc nunca foi aceito, mas ainda aparece nas pastas de trabalho.
@@ -129,6 +131,8 @@ def extrair_blocos_de_fonte(
         return converter_pdf_para_blocos(fonte, max_nivel=max_nivel)
     elif sufixo == ".odt":
         return converter_odt_para_blocos(fonte, max_nivel=max_nivel, citacao=citacao, avisos=avisos)
+    elif sufixo in EXTENSOES_HTML:
+        return converter_html_para_blocos(fonte, max_nivel=max_nivel, avisos=avisos)
     elif sufixo in FORMATOS_RETIRADOS:
         raise ValueError(FORMATOS_RETIRADOS[sufixo])
     else:
@@ -444,7 +448,34 @@ def entra_na_varredura(arquivo: Path) -> bool:
     arquivos. A trava do Word (~$) e os ocultos têm extensão válida, mas não são documentos:
     convertê-los só produziria falha.
     """
-    return arquivo.suffix.lower() in EXTENSOES_RECONHECIDAS and not arquivo.name.startswith(("~$", "."))
+    if arquivo.suffix.lower() not in EXTENSOES_RECONHECIDAS or arquivo.name.startswith(("~$", ".")):
+        return False
+    return not eh_saida_do_conversor(arquivo)
+
+
+# Nomes que derivar_caminho_saida e montar_saidas dão à saída: "nota_SEI.html",
+# "nota_SEI_parte02.html", "nota_SEI_corpo_parte02.html" e "Nota_Tecnica_SEI_12.html"
+RE_NOME_DA_SAIDA = re.compile(r"(?:_SEI|^Nota_Tecnica_SEI_.*?)(?:_corpo)?(?:_parte\d+)?\.html?$", re.IGNORECASE)
+
+
+def eh_saida_do_conversor(arquivo: Path) -> bool:
+    """Diz se o HTML foi gerado por este conversor, pelo nome ou pelo título.
+
+    Sem -o, a saída vai para a pasta da entrada, e o modo watch a converteria de novo a
+    cada volta ("nota_SEI_SEI.html", e assim por diante). O título cobre o nome escolhido
+    com --saida; o nome cobre a saída com --corpo, que não tem título. Pedido pelo nome
+    do arquivo, o HTML gerado ainda é convertido: a regra vale só para a varredura.
+    """
+    if arquivo.suffix.lower() not in EXTENSOES_HTML:
+        return False
+    if RE_NOME_DA_SAIDA.search(arquivo.name):
+        return True
+    try:
+        with arquivo.open("rb") as f:
+            inicio = f.read(1024)
+    except OSError:
+        return False
+    return f"<title>{TITULO_DA_SAIDA}</title>".encode() in inicio
 
 
 def converter_diretorio(
