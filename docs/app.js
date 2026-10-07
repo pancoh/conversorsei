@@ -1213,7 +1213,7 @@ async function processFile(file, selecao, opcoes) {
 const MAXIMO_TRECHOS = 5;
 
 // Quadro da citação pela forma: diz quantos parágrafos têm forma de citação (recuados
-// em fonte menor, ou inteiros entre aspas), mostra o começo deles e oferece a troca (ou
+// em fonte menor, ou numa citação entre aspas), mostra o começo deles e oferece a troca (ou
 // o desfazer), já que a conversão não aplica as regras sozinha
 function renderCitacao(recuo, aspas, documentos, trechos) {
   const total = recuo + aspas;
@@ -1225,14 +1225,14 @@ function renderCitacao(recuo, aspas, documentos, trechos) {
   const um = total === 1;
   const onde = emLote && documentos > 1 ? ` em ${documentos} documentos` : '';
   const partes = `${recuo} ${recuo === 1 ? 'recuado' : 'recuados'} e em fonte menor que a do texto e ` +
-    `${aspas} ${aspas === 1 ? 'inteiro' : 'inteiros'} entre aspas`;
+    `${aspas} entre aspas`;
   if (citacaoPorRecuo) {
     if (recuo && aspas) {
       resCitacaoTexto.textContent = `${total} parágrafos${onde} foram convertidos como Citação: ${partes}.`;
     } else {
       const forma = recuo
         ? (um ? 'recuado e em fonte menor que a do texto' : 'recuados e em fonte menor que a do texto')
-        : (um ? 'inteiro entre aspas' : 'inteiros entre aspas');
+        : 'entre aspas';
       resCitacaoTexto.textContent = um
         ? `1 parágrafo ${forma}${onde} foi convertido como Citação.`
         : `${total} parágrafos ${forma}${onde} foram convertidos como Citação.`;
@@ -1249,8 +1249,8 @@ function renderCitacao(recuo, aspas, documentos, trechos) {
         : `${total} parágrafos${onde} estão recuados e em fonte menor que a do texto, como citações. Eles saíram como texto comum.`;
     } else {
       resCitacaoTexto.textContent = um
-        ? `1 parágrafo${onde} está inteiro entre aspas e passa de uma linha, como uma citação. Ele saiu como texto comum.`
-        : `${total} parágrafos${onde} estão inteiros entre aspas e passam de uma linha, como citações. Eles saíram como texto comum.`;
+        ? `1 parágrafo${onde} está entre aspas e passa de uma linha, como uma citação. Ele saiu como texto comum.`
+        : `${total} parágrafos${onde} estão em citações entre aspas com mais de uma linha. Eles saíram como texto comum.`;
     }
     btnCitacao.textContent = 'Converter como citação';
     resCitacaoResumo.textContent = `Citações: ${total} possíveis`;

@@ -97,7 +97,7 @@ def aviso_de_citacao(res: ResultadoConversao, aplicada: bool) -> str | None:
     if not aspas:
         sujeito = f"{paragrafos} {'recuado' if um else 'recuados'} e em fonte menor que a do texto"
     elif not recuo:
-        sujeito = f"{paragrafos} entre aspas e com mais de uma linha"
+        sujeito = f"{paragrafos} {'entre aspas' if um else 'em citações entre aspas'} com mais de uma linha"
     else:
         sujeito = f"{paragrafos} ({recuo} recuados e em fonte menor, {aspas} entre aspas)"
     if aplicada:
@@ -243,7 +243,7 @@ Exemplos de uso:
         action="store_true",
         help=(
             "Converte como Citação o parágrafo recuado (2 cm ou mais) e em fonte menor que a do texto (.docx e "
-            ".odt) e o parágrafo inteiro entre aspas com mais de uma linha (todos os formatos)."
+            ".odt) e os parágrafos de uma citação entre aspas com mais de uma linha (todos os formatos)."
         ),
     )
     parser.add_argument(

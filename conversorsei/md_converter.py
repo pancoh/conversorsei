@@ -453,7 +453,11 @@ CLASSE_POR_ALINHAMENTO = {"center": "Texto_Centralizado", "right": "Texto_Alinha
 
 
 def linha_com_classe(
-    texto: str, formato: Formatacao, explicita: str | None = None, citacao: CitacaoPorRecuo | None = None
+    texto: str,
+    formato: Formatacao,
+    explicita: str | None = None,
+    citacao: CitacaoPorRecuo | None = None,
+    entre_aspas: bool = False,
 ) -> str:
     """Linha de Markdown de um parágrafo lido de ODT, com a classe SEI quando houver.
 
@@ -467,9 +471,14 @@ def linha_com_classe(
     isso, o título em caixa alta viraria Texto_Justificado_Maiusculas e sairia da
     numeração do SEI. Se estiver riscado, segue item, com o texto riscado. Pelo mesmo
     motivo, a citação pelo recuo (`citacao`) só é considerada depois dessas regras, na
-    ordem do docx_converter.
+    ordem do docx_converter. O parágrafo de uma citação entre aspas (`entre_aspas`) é a
+    exceção, também como no Word: "a)" e "1." dentro dela são texto citado.
     """
     classe = explicita
+    if not classe and entre_aspas and citacao is not None:
+        classe = citacao.classe(formato, texto_sem_marcacao(texto), entre_aspas=True)
+        # As regras de citação já foram vistas: sem isto, o parágrafo seria contado de novo
+        citacao = None
     if not classe:
         if comeca_com_item(texto):
             return texto

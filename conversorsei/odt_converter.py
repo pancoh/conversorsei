@@ -20,6 +20,7 @@ from conversorsei.formatacao import (
     classe_sei_pelo_nome,
     fonte_predominante,
     linhas_de_assinatura,
+    paragrafos_entre_aspas,
     pode_ser_linha_de_assinatura,
 )
 from conversorsei.md_converter import (
@@ -32,6 +33,7 @@ from conversorsei.md_converter import (
     linha_de_assinatura,
     marcar_colunas_mescladas,
     riscar_inteiro,
+    texto_sem_marcacao,
 )
 
 NS = {
@@ -435,6 +437,38 @@ def fonte_do_corpo(corpo: ElementTree.Element, formatos: dict[str, Formatacao]) 
     return fonte_predominante(amostras)
 
 
+def citacao_entre_aspas(
+    corpo: ElementTree.Element, estilos: dict[str, FormatoTrecho], heranca: dict[str, str]
+) -> set[ElementTree.Element]:
+    """Parágrafos que estão numa citação entre aspas com mais de uma linha.
+
+    Achados antes de montar o Markdown, porque a citação pode abrir num parágrafo e
+    fechar vários depois. Segue a política de formatacao.paragrafos_entre_aspas, comum
+    ao Word. Título, lista e tabela interrompem a citação: não passam por
+    linha_com_classe e não teriam como sair como Citação.
+    """
+    elementos: list[ElementTree.Element] = []
+    textos: list[str | None] = []
+
+    def visitar(no: ElementTree.Element) -> None:
+        for filho in no:
+            if filho.tag in (_q("text", "h"), _q("text", "p")):
+                texto = texto_do_no(filho, estilos).strip()
+                if not texto:
+                    continue
+                titulo = filho.tag == _q("text", "h") or nivel_do_estilo(filho.get(_q("text", "style-name")), heranca)
+                elementos.append(filho)
+                textos.append(None if titulo else texto_sem_marcacao(texto))
+            elif filho.tag in (_q("table", "table"), _q("text", "list")):
+                elementos.append(filho)
+                textos.append(None)
+            else:
+                visitar(filho)
+
+    visitar(corpo)
+    return {elementos[i] for i in paragrafos_entre_aspas(textos)}
+
+
 def converter_corpo(
     corpo: ElementTree.Element,
     estilos: dict[str, FormatoTrecho],
@@ -460,6 +494,7 @@ def converter_corpo(
     # Um registro por parágrafo com texto ou tabela, na ordem, para achar o bloco de
     # assinatura: (índice da linha, candidata, formato, texto)
     registros: list[tuple[int, bool, Formatacao, str]] = []
+    aspas = citacao_entre_aspas(corpo, estilos, heranca) if citacao is not None else set()
 
     def registrar(candidata: bool = False, formato: Formatacao | None = None, texto: str = "") -> None:
         registros.append((len(linhas) - 1, candidata, formato or Formatacao(), texto))
@@ -491,7 +526,7 @@ def converter_corpo(
                     registrar()
                 else:
                     explicita = classe_explicita(filho.get(_q("text", "style-name")), heranca_completa)
-                    linhas.append(linha_com_classe(texto, formato, explicita, citacao))
+                    linhas.append(linha_com_classe(texto, formato, explicita, citacao, filho in aspas))
                     candidata = (
                         not explicita
                         and not comeca_com_item(texto)

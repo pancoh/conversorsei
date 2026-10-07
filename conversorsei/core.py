@@ -85,7 +85,7 @@ class ResultadoMemoria:
     erros: list[str] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
     # Parágrafos com forma de citação, convertidos ou não: recuados e em fonte menor,
-    # ou inteiros entre aspas
+    # ou numa citação entre aspas
     citacoes_por_recuo: int = 0
     citacoes_entre_aspas: int = 0
     # Início de cada um desses parágrafos, na ordem do documento
@@ -102,7 +102,7 @@ class ResultadoConversao:
     erros: list[str] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
     # Parágrafos com forma de citação, convertidos ou não: recuados e em fonte menor,
-    # ou inteiros entre aspas
+    # ou numa citação entre aspas
     citacoes_por_recuo: int = 0
     citacoes_entre_aspas: int = 0
     # Início de cada um desses parágrafos, na ordem do documento

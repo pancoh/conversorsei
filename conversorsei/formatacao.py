@@ -168,25 +168,64 @@ def parece_citacao(f: Formatacao, fonte_do_corpo: float | None) -> bool:
     )
 
 
-def parece_citacao_entre_aspas(f: Formatacao, texto: str) -> bool:
-    """Indica se o parágrafo é uma citação inteira entre aspas que passa de uma linha.
+def _fecha_no_fim(texto: str, fecha: str) -> bool:
+    """As aspas fecham uma vez só, e depois delas vêm só pontuação e a referência.
 
-    As aspas abrem o parágrafo e fecham no fim dele; depois delas só cabem pontuação e a
-    referência entre parênteses. Aspas fechadas no meio ("A" e "B") são falas curtas
-    dentro do texto, e não uma citação. Uma quebra de linha dentro das aspas basta para
-    passar de uma linha. Centralizado ou à direita fica de fora, como na regra do recuo.
+    Aspas fechadas no meio ("A" e "B") são falas curtas dentro do texto, e não citação.
     """
-    texto = texto.strip()
-    if f.alinhamento not in (None, "left", "justify") or not texto or texto[0] not in ASPAS:
+    if texto.count(fecha) != 1:
         return False
-    fecha = ASPAS[texto[0]]
-    fim = texto.rfind(fecha)
-    if fim <= 0 or not RE_DEPOIS_DAS_ASPAS.fullmatch(texto[fim + 1 :]):
-        return False
-    miolo = texto[1:fim].strip()
-    if fecha in miolo:
-        return False
-    return "\n" in miolo or len(miolo) >= MINIMO_LETRAS_CITACAO_ENTRE_ASPAS
+    return RE_DEPOIS_DAS_ASPAS.fullmatch(texto[texto.index(fecha) + 1 :]) is not None
+
+
+def _fim_da_citacao(textos: list[str | None], inicio: int, abre: str, fecha: str) -> int | None:
+    """Índice do parágrafo que fecha as aspas abertas antes de `inicio`, se houver.
+
+    O parágrafo do meio pode reabrir as aspas, como manda a convenção da citação em
+    vários parágrafos. Uma tabela (None) interrompe a busca, e aspas que fecham no meio
+    de um parágrafo desfazem a citação.
+    """
+    for j in range(inicio, len(textos)):
+        texto = textos[j]
+        if texto is None:
+            return None
+        texto = texto.strip().removeprefix(abre)
+        if fecha in texto:
+            return j if _fecha_no_fim(texto, fecha) else None
+    return None
+
+
+def paragrafos_entre_aspas(textos: list[str | None]) -> set[int]:
+    """Índices dos parágrafos que formam uma citação entre aspas com mais de uma linha.
+
+    Recebe o texto de cada parágrafo, na ordem, sem os vazios, e None no lugar de cada
+    tabela. A citação abre com aspas no começo de um parágrafo e fecha no fim dele ou
+    de um dos seguintes. Num parágrafo só, o miolo precisa passar de uma linha (ou ter
+    uma quebra dentro); em vários, já passa. A política fica aqui, e não em cada
+    leitor, para Word e ODT marcarem os mesmos parágrafos.
+    """
+    membros: set[int] = set()
+    i = 0
+    while i < len(textos):
+        texto = (textos[i] or "").strip()
+        if not texto or texto[0] not in ASPAS:
+            i += 1
+            continue
+        abre, fecha = texto[0], ASPAS[texto[0]]
+        resto = texto[1:]
+        if fecha in resto:
+            miolo = resto[: resto.index(fecha)].strip()
+            if _fecha_no_fim(resto, fecha) and ("\n" in miolo or len(miolo) >= MINIMO_LETRAS_CITACAO_ENTRE_ASPAS):
+                membros.add(i)
+            i += 1
+            continue
+        fim = _fim_da_citacao(textos, i + 1, abre, fecha)
+        if fim is None:
+            i += 1
+            continue
+        membros.update(range(i, fim + 1))
+        i = fim + 1
+    return membros
 
 
 @dataclass
@@ -197,7 +236,9 @@ class CitacaoPorRecuo:
     Quem converte cria o objeto e diz se as regras se aplicam (`aplicar`). O leitor do
     formato preenche `fonte_do_corpo` antes de percorrer o documento e conta cada
     parágrafo com forma de citação, aplicando a classe ou não: em `encontradas` o
-    recuado em fonte menor e em `entre_aspas` o parágrafo inteiro entre aspas. As duas
+    recuado em fonte menor e em `entre_aspas` o que está numa citação entre aspas (que
+    o leitor acha antes, por paragrafos_entre_aspas, porque ela pode ocupar vários
+    parágrafos). As duas
     contagens ficam separadas para a interface dizer por que sugere a troca. O início
     de cada parágrafo fica em `trechos`, na ordem do documento, para quem decide ver o
     que muda sem procurar os parágrafos na prévia.
@@ -209,11 +250,15 @@ class CitacaoPorRecuo:
     entre_aspas: int = 0
     trechos: list[str] = field(default_factory=list)
 
-    def classe(self, f: Formatacao, texto: str = "") -> str | None:
-        """Conta o parágrafo com forma de citação e devolve "Citação" só se pedida."""
+    def classe(self, f: Formatacao, texto: str = "", entre_aspas: bool = False) -> str | None:
+        """Conta o parágrafo com forma de citação e devolve "Citação" só se pedida.
+
+        `entre_aspas` diz se o parágrafo está numa citação entre aspas. Centralizado ou à
+        direita fica de fora, como na regra do recuo: costuma ser legenda ou epígrafe.
+        """
         if parece_citacao(f, self.fonte_do_corpo):
             self.encontradas += 1
-        elif parece_citacao_entre_aspas(f, texto):
+        elif entre_aspas and f.alinhamento in (None, "left", "justify"):
             self.entre_aspas += 1
         else:
             return None

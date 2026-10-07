@@ -29,6 +29,7 @@ from conversorsei.formatacao import (
     fonte_predominante,
     linhas_de_assinatura,
     maior_tamanho,
+    paragrafos_entre_aspas,
     pode_ser_linha_de_assinatura,
     texto_em_maiusculas,
 )
@@ -657,6 +658,27 @@ def bloco_de_assinatura(doc: DocumentoWord) -> set:
     return set(elementos[len(elementos) - n :]) if n else set()
 
 
+def citacao_entre_aspas(doc: DocumentoWord) -> set:
+    """Parágrafos que estão numa citação entre aspas com mais de uma linha.
+
+    Achados antes da conversão, porque a citação pode abrir num parágrafo e fechar
+    vários depois. Parágrafos vazios não contam, e uma tabela interrompe a citação. A
+    política fica em formatacao.paragrafos_entre_aspas, comum ao ODT.
+    """
+    elementos: list = []
+    textos: list[str | None] = []
+    for filho in _blocos_visiveis(doc.element.body):
+        if filho.tag == qn("w:tbl"):
+            elementos.append(filho)
+            textos.append(None)
+        elif filho.tag == qn("w:p"):
+            texto = texto_visivel(Paragraph(filho, doc))
+            if texto.strip():
+                elementos.append(filho)
+                textos.append(texto)
+    return {elementos[i] for i in paragrafos_entre_aspas(textos)}
+
+
 # Marca da assinatura eletrônica, com ou sem colchetes ou parênteses. Sai sempre no mesmo
 # texto, em itálico, e separa uma assinatura da outra
 RE_MARCA_ASSINATURA = re.compile(r"^[\[(]?\s*assinad[oa]\s+eletronicamente\s*[\])]?\.?$", re.IGNORECASE)
@@ -706,6 +728,7 @@ def converter_paragrafo(
     convencao: str = "titulos",
     citacao: CitacaoPorRecuo | None = None,
     assinatura: bool = False,
+    entre_aspas: bool = False,
 ) -> tuple[str, str] | None:
     inline_bruto = paragrafo_inline(doc, p)
     inline = inline_bruto.strip()
@@ -729,6 +752,11 @@ def converter_paragrafo(
         cls = explicita
     elif assinatura:
         cls = CLASSE_ASSINATURA
+    elif entre_aspas and citacao is not None and citacao.classe(formatacao_do_paragrafo(p, alinhamento(p)), texto, True):
+        # Dentro da citação, "a)" e "1." são texto citado: nem alínea, nem item, e o
+        # número fica no texto
+        cls = "Citação"
+        prof = 0
     elif prof:
         if convencao == "paragrafos":
             # Documento de parágrafos numerados: sem caixa alta nem tarja cinza
@@ -744,7 +772,8 @@ def converter_paragrafo(
             primeira_linha,
             nivel_base_lista=nivel_base_lista,
             convencao=convencao,
-            citacao=citacao,
+            # Na citação entre aspas, as regras de citação já foram vistas acima
+            citacao=None if entre_aspas else citacao,
         )
 
     literal = cls == "Texto_Mono_Espaçado"
@@ -1065,6 +1094,7 @@ def converter_docx_para_blocos(
     if citacao is not None:
         citacao.fonte_do_corpo = fonte_do_corpo(doc)
     assinatura = bloco_de_assinatura(doc)
+    aspas = citacao_entre_aspas(doc) if citacao is not None else set()
 
     for child in _blocos_visiveis(doc.element.body):
         if child.tag == qn("w:p"):
@@ -1076,6 +1106,7 @@ def converter_docx_para_blocos(
                 convencao=convencao,
                 citacao=citacao,
                 assinatura=child in assinatura,
+                entre_aspas=child in aspas,
             )
             if res is None:
                 continue

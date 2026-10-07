@@ -646,14 +646,14 @@ def test_citacao_entre_aspas_e_sugerida_e_convertida_pelo_botao(contexto: object
     assert 'class="Citação"' not in pagina.evaluate("() => currentResultFiles[0].conteudo")
     texto = pagina.locator("#res-citacao-texto").text_content()
     assert texto == (
-        "1 parágrafo está inteiro entre aspas e passa de uma linha, como uma citação. Ele saiu como texto comum."
+        "1 parágrafo está entre aspas e passa de uma linha, como uma citação. Ele saiu como texto comum."
     )
 
     pagina.locator("#res-ajustes summary").click()
     pagina.click("#btn-citacao")
     _resultado_com(pagina, f'class="Citação">{ENTRE_ASPAS}')
     assert pagina.locator("#res-citacao-texto").text_content() == (
-        "1 parágrafo inteiro entre aspas foi convertido como Citação."
+        "1 parágrafo entre aspas foi convertido como Citação."
     )
     assert pagina.locator("#btn-citacao").text_content() == "Manter citações como texto"
     assert not erros, erros

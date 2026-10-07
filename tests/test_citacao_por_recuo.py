@@ -21,6 +21,7 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 
 from conversorsei.cli import main
+from conversorsei.formatacao import paragrafos_entre_aspas
 from conversorsei.web import converter_documento_memoria
 
 RE_PARAGRAFO = re.compile(r'<p class="([^"]+)">(.*?)</p>', re.DOTALL)
@@ -432,7 +433,103 @@ def test_cli_explica_a_citacao_entre_aspas(tmp_path, capsys):
     entrada.write_text(f"Texto do parecer.\n\n{ENTRE_ASPAS}\n", encoding="utf-8")
 
     assert main([str(entrada), "-o", str(tmp_path / "a")]) == 0
-    assert "1 parágrafo entre aspas e com mais de uma linha parece citação" in capsys.readouterr().out
+    assert "1 parágrafo entre aspas com mais de uma linha parece citação" in capsys.readouterr().out
 
     assert main([str(entrada), "-o", str(tmp_path / "b"), "--json"]) == 0
     assert json.loads(capsys.readouterr().out)[0]["citacoes_entre_aspas"] == 1
+
+
+# Citação entre aspas em vários parágrafos: as aspas abrem num parágrafo e fecham noutro,
+# como no pedido transcrito num despacho
+@pytest.mark.parametrize(
+    "textos, esperados",
+    [
+        (["Abaixo:", '"Primeiro parágrafo.', "Segundo.", 'Terceiro."', "Depois."], {1, 2, 3}),
+        # Convenção que reabre as aspas a cada parágrafo
+        (["“Primeiro.", "“Segundo.", "“Terceiro.” (BRASIL, 2020)."], {0, 1, 2}),
+        # Aspas que nunca fecham
+        (['"Primeiro.', "Segundo.", "Terceiro."], set()),
+        # Aspas que fecham no meio de um parágrafo seguinte: fala curta, e não citação
+        (['"Primeiro.', 'Segundo" e depois o texto do despacho continua.'], set()),
+        # Tabela no meio interrompe a citação
+        (['"Primeiro.', None, 'Terceiro."'], set()),
+        # Duas citações seguidas
+        (['"A.', 'B."', "Meio.", "“C.", "D.”"], {0, 1, 3, 4}),
+    ],
+)
+def test_paragrafos_entre_aspas(textos, esperados):
+    assert paragrafos_entre_aspas(textos) == esperados
+
+
+DESPACHO = """Faço referência ao pedido de acesso à informação, conforme o seu inteiro teor abaixo:
+
+"Estamos realizando um levantamento sobre a comunicação de risco nos ministérios.
+Caso parte das informações seja sigilosa, peço que sejam observados os procedimentos:
+a) Separe as informações que podem ser fornecidas;
+b) Justifique a negativa, indicando o fundamento legal.
+1. O Ministério possui área responsável pela comunicação de risco?
+Assim, encaminham-se os autos para manifestação."
+Sobre o assunto, informa-se que esta unidade não possui área com essa finalidade.
+"""
+
+
+@pytest.mark.parametrize("nome", ["despacho.txt", "despacho.md"])
+def test_citacao_em_varios_paragrafos_e_sugerida_por_inteiro(nome):
+    classes, res = converter_aspas(nome, DESPACHO.encode())
+    assert res["citacoes_entre_aspas"] == 6
+    assert len(res["citacoes_trechos"]) == 6
+    assert res["citacoes_trechos"][0].startswith('"Estamos')
+
+    classes, res = converter_aspas(nome, DESPACHO.encode(), aplicar=True)
+    citados = [t for t, c in classes.items() if c == "Citação"]
+    assert len(citados) == 6
+    # Dentro da citação, "a)" e "1." são texto citado: ficam no texto e não viram item
+    assert "a) Separe as informações que podem ser fornecidas;" in citados
+    assert "1. O Ministério possui área responsável pela comunicação de risco?" in citados
+    assert classes["Sobre o assunto, informa-se que esta unidade não possui área com essa finalidade."] != "Citação"
+
+
+def test_word_numero_dentro_da_citacao_so_deixa_de_ser_item_a_pedido():
+    doc = docx.Document()
+    _corpo_comum(doc)
+    for texto in ["“Dispõe a norma:", "1. Fica instituído o comitê.", "2. O comitê se reúne mensalmente.”"]:
+        _paragrafo(doc, texto)
+    _paragrafo(doc, "Texto do despacho depois da citação.")
+
+    classes, res = converter_aspas("t.docx", _salvar(doc))
+    assert res["citacoes_entre_aspas"] == 3
+    assert classes["Fica instituído o comitê."] == "Item_Nivel1"
+
+    classes, _ = converter_aspas("t.docx", _salvar(doc), aplicar=True)
+    assert classes["1. Fica instituído o comitê."] == "Citação"
+    assert classes["2. O comitê se reúne mensalmente.”"] == "Citação"
+    assert classes["Texto do despacho depois da citação."] == "Texto_Justificado"
+
+
+def test_word_tabela_interrompe_a_citacao():
+    doc = docx.Document()
+    _corpo_comum(doc)
+    _paragrafo(doc, "“Primeiro parágrafo citado.")
+    doc.add_table(rows=1, cols=1).cell(0, 0).paragraphs[0].add_run("Célula")
+    _paragrafo(doc, "Último parágrafo citado.”")
+    _, res = converter_aspas("t.docx", _salvar(doc), aplicar=True)
+    assert res["citacoes_entre_aspas"] == 0
+
+
+def test_odt_citacao_em_varios_paragrafos():
+    conteudo = odt_com_paragrafos(
+        ("P1", "Trata-se de análise da proposição, com os fundamentos a seguir."),
+        ("P1", "“Primeiro parágrafo citado."),
+        ("P1", "a) alínea citada;"),
+        ("P2", "Último parágrafo citado, recuado e em fonte menor.”"),
+        ("P1", "Texto do despacho depois da citação."),
+    )
+    classes, res = converter_aspas("nt.odt", conteudo)
+    # O recuado conta pelo recuo, e uma vez só
+    assert (res["citacoes_por_recuo"], res["citacoes_entre_aspas"]) == (1, 2)
+    assert len(res["citacoes_trechos"]) == 3
+
+    classes, _ = converter_aspas("nt.odt", conteudo, aplicar=True)
+    assert classes["a) alínea citada;"] == "Citação"
+    assert classes["Último parágrafo citado, recuado e em fonte menor.”"] == "Citação"
+    assert classes["Texto do despacho depois da citação."] == "Texto_Justificado"
