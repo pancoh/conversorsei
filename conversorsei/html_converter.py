@@ -23,6 +23,7 @@ from html.parser import HTMLParser
 from conversorsei.entrada import FonteDocumento, ler_bytes, nome_da_fonte
 from conversorsei.formatacao import (
     ESTILO_NUMERO_LITERAL,
+    RE_MARCA_ASSINATURA,
     CitacaoPorRecuo,
     Formatacao,
     classe_sei_pelo_nome,
@@ -147,6 +148,24 @@ def numero_do_item(posicao: int, tipo: str) -> str:
                 posicao -= valor
         return f"{romano if tipo == 'I' else romano.lower()} -"
     return f"{posicao}."
+
+
+def assinatura_em_linhas(texto: str) -> list[str]:
+    """Separa em parágrafos a assinatura escrita com quebras de linha num parágrafo só.
+
+    O chat e o Shift+Enter escrevem a marca, o nome e o cargo num parágrafo, com <br>.
+    Assim, a marca não fica sozinha na linha, e o bloco de assinatura não a reconhece.
+    Quando uma linha é a marca e dela até o fim só há linhas curtas, cada uma vira um
+    parágrafo; o que vem antes (o "Atenciosamente,") fica junto, num parágrafo próprio.
+    Sem isso, devolve o texto como veio.
+    """
+    partes = [parte.strip() for parte in texto.split(MARCA_QUEBRA_ODT)]
+    visiveis = [desescapar_markdown(parte) for parte in partes]
+    marca = next((i for i, linha in enumerate(visiveis) if RE_MARCA_ASSINATURA.match(linha)), None)
+    if marca is None or not all(linha_curta(linha) for linha in visiveis[marca:] if linha):
+        return [texto]
+    antes = MARCA_QUEBRA_ODT.join(partes[:marca]).strip(MARCA_QUEBRA_ODT).strip()
+    return ([antes] if antes else []) + [parte for parte in partes[marca:] if parte]
 
 
 class MontadorDeArvore(HTMLParser):
@@ -437,6 +456,11 @@ class LeitorHtml:
         if RE_TEXTO_DO_SEI.match(visivel):
             self.textos_do_sei += 1
             return
+        for linha in assinatura_em_linhas(texto):
+            self._emitir_paragrafo(linha, trechos, dono, contexto)
+
+    def _emitir_paragrafo(self, texto: str, trechos: list[Enfase], dono: No | None, contexto: Contexto) -> None:
+        visivel = desescapar_markdown(texto)
         formato = Formatacao(
             alinhamento=contexto.alinhamento,
             negrito=all(t.negrito for t in trechos),

@@ -294,3 +294,25 @@ def test_linhas_de_assinatura_pela_marca():
     assert linhas_de_assinatura([False] * 3, [None, "Atenciosamente,", "[assinado eletronicamente]"]) == 0
     # A regra da centralização continua valendo, e vale a maior das duas
     assert linhas_de_assinatura([False, True, True, True, True], textos) == 4
+
+
+def test_assinatura_com_quebras_de_linha_num_paragrafo_so():
+    """O chat escreve a marca, o nome e o cargo num parágrafo, separados por <br>."""
+    fim = "<p>Diante do exposto, submeto o processo.</p>"
+    for assinatura in (
+        "<p>Atenciosamente,</p><p>[assinado eletronicamente]<br>FULANO DE TAL<br>Coordenador-Geral</p>",
+        "<p>Atenciosamente,<br><br>[assinado eletronicamente]<br>FULANO DE TAL<br>Coordenador-Geral</p>",
+    ):
+        corpo = paragrafos((fim + assinatura).encode(), "texto_colado.html")
+        assert corpo == [
+            ("Texto_Justificado", "Diante do exposto, submeto o processo."),
+            ("Texto_Justificado", "Atenciosamente,"),
+            ("Tabela_Texto_Centralizado", "<em>[Assinado eletronicamente]</em>"),
+            ("Tabela_Texto_Centralizado", "FULANO DE TAL"),
+            ("Tabela_Texto_Centralizado", "Coordenador-Geral"),
+        ]
+
+
+def test_quebra_de_linha_sem_marca_continua_no_mesmo_paragrafo():
+    corpo = paragrafos(b"<p>Texto com linha<br>quebrada no meio.</p>", "texto_colado.html")
+    assert corpo == [("Texto_Justificado", "Texto com linha<br />quebrada no meio.")]

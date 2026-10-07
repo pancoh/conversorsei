@@ -5,6 +5,12 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+- **Rodapé.** A versão passa a ocupar uma linha própria, e o rodapé deixa de quebrar o texto
+  e os botões em telas médias.
+- **Assinatura colada de um chat.** A assinatura escrita num parágrafo só, com a marca, o
+  nome e o cargo em linhas quebradas, passa a sair como bloco de assinatura, uma linha por
+  parágrafo.
+
 ## 0.5.0 (2026-10-07)
 
 - **Citação entre aspas.** O parágrafo inteiro entre aspas que passa de uma linha, e a

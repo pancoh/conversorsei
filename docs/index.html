@@ -17,7 +17,7 @@
   <!-- Bibliotecas servidas localmente (vendor/), com versão fixa e sem depender de CDN de terceiros -->
   <!-- O ?v= é a marca de versão do conteúdo, gravada por scripts/bundle_web.py: cada versão
        tem um endereço próprio, e nenhum cache entrega o HTML novo com o CSS ou o app.js antigo -->
-  <link href="estilos.css?v=cfc9f488a8" rel="stylesheet">
+  <link href="estilos.css?v=36323ff692" rel="stylesheet">
   <link href="vendor/fonts.css" rel="stylesheet">
   <script src="vendor/lucide-1.33.0.min.js"></script>
   <script src="vendor/jszip-3.10.1.min.js"></script>
@@ -384,6 +384,10 @@
       <div id="novidades-lista" class="p-5 overflow-y-auto space-y-5 text-sm text-slate-600">
         <!-- novidades:inicio -->
         <section class="space-y-2">
+          <h4 class="font-semibold text-slate-800">Em desenvolvimento <span class="font-normal text-slate-500">já na página</span></h4>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Rodapé.</strong> A versão passa a ocupar uma linha própria, e o rodapé deixa de quebrar o texto e os botões em telas médias.</li><li><strong>Assinatura colada de um chat.</strong> A assinatura escrita num parágrafo só, com a marca, o nome e o cargo em linhas quebradas, passa a sair como bloco de assinatura, uma linha por parágrafo.</li></ul>
+        </section>
+        <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Versão 0.5.0 <span class="font-normal text-slate-500">7 de outubro de 2026</span></h4>
           <ul class="list-disc pl-5 space-y-1.5"><li><strong>Citação entre aspas.</strong> O parágrafo inteiro entre aspas que passa de uma linha, e a transcrição entre aspas que ocupa vários parágrafos, passam a ser sugeridos como citação, em todos os formatos. Como na citação recuada, eles saem como texto comum, e o botão "Converter como citação" faz a troca. Dentro da citação, "a)" e "1." ficam no texto, sem virar alínea ou item.</li><li><strong>Lista numerada colada.</strong> A lista numerada que vem em HTML, como a copiada de um chat de IA, sai com o número escrito no texto ("1.", "a)"), e não mais com marcadores. O número não entra na numeração do documento.</li><li><strong>Assinatura sem centralização.</strong> A marca "[assinado eletronicamente]" no fim do documento, seguida de nome e cargo, abre o bloco de assinatura mesmo sem centralização, como no texto colado e no .txt.</li><li><strong>Versão e novidades.</strong> O rodapé mostra a versão da página, e o quadro Novidades traz o histórico de cada versão.</li></ul>
         </section>
@@ -447,17 +451,22 @@
        abaixo, a nota sobre a contagem de acessos, em tom mais baixo -->
   <footer class="border-t border-slate-200 bg-white mt-8">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4 text-xs text-slate-500">
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
-        <p class="text-center sm:text-left">
-          <span class="font-semibold text-slate-700">Conversor SEI</span>
-          <span aria-hidden="true" class="mx-1 text-slate-300">|</span>
+      <div class="flex flex-col lg:flex-row items-center justify-between gap-3">
+        <!-- A versão fica numa linha própria: na mesma linha do nome, o texto e os três botões
+             não cabiam juntos na largura do rodapé. Lado a lado só a partir de lg: abaixo
+             disso os dois blocos quebravam, e empilhados ficam inteiros -->
+        <div class="text-center lg:text-left space-y-1">
+          <p>
+            <span class="font-semibold text-slate-700">Conversor SEI</span>
+            <span aria-hidden="true" class="mx-1 text-slate-300">|</span>
+            código aberto sob licença MIT
+          </p>
           <!-- A versão vem do CHANGELOG.md, gravada pelo scripts/bundle_web.py -->
           <button id="btn-novidades" type="button" class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline" title="Ver as novidades de cada versão">
             <i data-lucide="tag" class="w-3.5 h-3.5"></i>versão <span id="versao-atual">0.5.0</span>
+            <span aria-hidden="true" class="mx-1 text-slate-300">·</span>novidades
           </button>
-          <span aria-hidden="true" class="mx-1 text-slate-300">|</span>
-          código aberto sob licença MIT
-        </p>
+        </div>
         <!-- Relato e sugestão por e-mail, com modelo preenchido, e apoio ao projeto por Pix -->
         <div class="flex flex-wrap justify-center gap-2">
           <a href="#" data-relato class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg font-semibold transition-colors">
@@ -472,11 +481,11 @@
         </div>
       </div>
       <div class="space-y-2 border-t border-slate-100 pt-4">
-        <p class="flex items-start justify-center sm:justify-start gap-1.5 text-center sm:text-left">
+        <p class="flex items-start justify-center lg:justify-start gap-1.5 text-center lg:text-left">
           <i data-lucide="info" class="w-3.5 h-3.5 mt-px flex-shrink-0 text-slate-400"></i>
           <span>Projeto independente e não oficial, sem vínculo com os órgãos responsáveis pelo SEI.</span>
         </p>
-        <p class="flex items-start justify-center sm:justify-start gap-1.5 text-center sm:text-left">
+        <p class="flex items-start justify-center lg:justify-start gap-1.5 text-center lg:text-left">
           <i data-lucide="shield-check" class="w-3.5 h-3.5 mt-px flex-shrink-0 text-slate-400"></i>
           <span>A página registra estatísticas anônimas de uso, sem cookies: número de acessos e formato dos arquivos convertidos.</span>
         </p>
