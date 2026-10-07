@@ -17,6 +17,8 @@
   <a href="#uso">Como usar</a>
   &nbsp;·&nbsp;
   <a href="#duvidas">Perguntas frequentes</a>
+  &nbsp;·&nbsp;
+  <a href="CHANGELOG.md">Novidades</a>
 </p>
 
 <p align="center">

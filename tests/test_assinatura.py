@@ -239,3 +239,58 @@ def test_odt_com_duas_assinaturas_tem_linha_em_branco_entre_elas():
         "<strong>CICLANO DE TAL</strong>",
         "Coordenador-Geral",
     ]
+
+
+# Sem centralização, a marca de assinatura no fim do documento abre o bloco: o texto
+# colado de um chat ou de um .txt não tem alinhamento, mas a marca, o nome e o cargo
+# dizem o que é a assinatura
+TEXTO_SEM_ALINHAMENTO = """Sobre o assunto, informa-se que esta unidade não possui área com essa finalidade.
+
+Atenciosamente,
+
+[assinado eletronicamente]
+FULANO DE TAL
+Coordenador-Geral
+"""
+
+
+def test_marca_no_fim_abre_o_bloco_mesmo_sem_centralizacao():
+    for nome in ("t.txt", "t.md"):
+        classes = [c for c, _ in paragrafos(TEXTO_SEM_ALINHAMENTO.encode(), nome)]
+        assert classes == ["Texto_Justificado", "Texto_Justificado"] + ["Tabela_Texto_Centralizado"] * 3, nome
+
+    html = "".join(f"<p>{linha}</p>" for linha in TEXTO_SEM_ALINHAMENTO.splitlines() if linha)
+    corpo = paragrafos(html.encode(), "texto_colado.html")
+    assert [c for c, _ in corpo][-3:] == ["Tabela_Texto_Centralizado"] * 3
+    assert corpo[-4] == ("Texto_Justificado", "Atenciosamente,")
+    assert corpo[-3][1] == "<em>[Assinado eletronicamente]</em>"
+
+
+def test_duas_assinaturas_sem_centralizacao_saem_separadas():
+    texto = TEXTO_SEM_ALINHAMENTO + "[assinado eletronicamente]\nCICLANO DE TAL\nDiretor\n"
+    corpo = paragrafos(texto.encode(), "t.txt")
+    assert [c for c, _ in corpo[-7:]] == ["Tabela_Texto_Centralizado"] * 7
+    assert corpo[-4][1] == "&nbsp;"
+
+
+def test_sem_marca_ou_com_texto_depois_dela_nada_muda():
+    sem_marca = TEXTO_SEM_ALINHAMENTO.replace("[assinado eletronicamente]\n", "")
+    assert "Tabela_Texto_Centralizado" not in {c for c, _ in paragrafos(sem_marca.encode(), "t.txt")}
+
+    # Um parágrafo comprido depois da marca: o fim do documento não é assinatura
+    depois = TEXTO_SEM_ALINHAMENTO + (
+        "Este parágrafo final é comprido demais para ser nome ou cargo, e por isso a marca acima não abre bloco.\n"
+    )
+    assert "Tabela_Texto_Centralizado" not in {c for c, _ in paragrafos(depois.encode(), "t.txt")}
+
+
+def test_linhas_de_assinatura_pela_marca():
+    from conversorsei.formatacao import linhas_de_assinatura
+
+    curtas = ["Texto.", "Atenciosamente,", "[assinado eletronicamente]", "NOME", "Cargo"]
+    textos = [None, *curtas[1:]]
+    assert linhas_de_assinatura([False] * 5, textos) == 3
+    # Só a marca, sem nome: menos linhas que o mínimo
+    assert linhas_de_assinatura([False] * 3, [None, "Atenciosamente,", "[assinado eletronicamente]"]) == 0
+    # A regra da centralização continua valendo, e vale a maior das duas
+    assert linhas_de_assinatura([False, True, True, True, True], textos) == 4

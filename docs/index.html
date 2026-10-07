@@ -17,7 +17,7 @@
   <!-- Bibliotecas servidas localmente (vendor/), com versão fixa e sem depender de CDN de terceiros -->
   <!-- O ?v= é a marca de versão do conteúdo, gravada por scripts/bundle_web.py: cada versão
        tem um endereço próprio, e nenhum cache entrega o HTML novo com o CSS ou o app.js antigo -->
-  <link href="estilos.css?v=086ba648f9" rel="stylesheet">
+  <link href="estilos.css?v=cfc9f488a8" rel="stylesheet">
   <link href="vendor/fonts.css" rel="stylesheet">
   <script src="vendor/lucide-1.33.0.min.js"></script>
   <script src="vendor/jszip-3.10.1.min.js"></script>
@@ -369,6 +369,42 @@
     </div>
   </div>
 
+  <!-- Novidades: o histórico do CHANGELOG.md, gravado pelo scripts/bundle_web.py -->
+  <div id="novidades-modal" role="dialog" aria-modal="true" aria-labelledby="novidades-titulo" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border border-slate-200">
+      <div class="px-5 py-3.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between rounded-t-2xl">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="tag" class="w-4 h-4 text-blue-600"></i>
+          <h3 id="novidades-titulo" class="text-sm font-semibold text-slate-800">Novidades</h3>
+        </div>
+        <button id="novidades-fechar" type="button" aria-label="Fechar" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div id="novidades-lista" class="p-5 overflow-y-auto space-y-5 text-sm text-slate-600">
+        <!-- novidades:inicio -->
+        <section class="space-y-2">
+          <h4 class="font-semibold text-slate-800">Versão 0.5.0 <span class="font-normal text-slate-500">7 de outubro de 2026</span></h4>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Citação entre aspas.</strong> O parágrafo inteiro entre aspas que passa de uma linha, e a transcrição entre aspas que ocupa vários parágrafos, passam a ser sugeridos como citação, em todos os formatos. Como na citação recuada, eles saem como texto comum, e o botão "Converter como citação" faz a troca. Dentro da citação, "a)" e "1." ficam no texto, sem virar alínea ou item.</li><li><strong>Lista numerada colada.</strong> A lista numerada que vem em HTML, como a copiada de um chat de IA, sai com o número escrito no texto ("1.", "a)"), e não mais com marcadores. O número não entra na numeração do documento.</li><li><strong>Assinatura sem centralização.</strong> A marca "[assinado eletronicamente]" no fim do documento, seguida de nome e cargo, abre o bloco de assinatura mesmo sem centralização, como no texto colado e no .txt.</li><li><strong>Versão e novidades.</strong> O rodapé mostra a versão da página, e o quadro Novidades traz o histórico de cada versão.</li></ul>
+        </section>
+        <section class="space-y-2">
+          <h4 class="font-semibold text-slate-800">Versão 0.4.0 <span class="font-normal text-slate-500">30 de setembro de 2026</span></h4>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>HTML como entrada.</strong> O conversor aceita arquivos .html. O HTML do próprio SEI chega com as mesmas classes, e a assinatura eletrônica e a nota de autenticidade saem, com aviso.</li><li><strong>Texto colado.</strong> Ctrl+V em qualquer ponto da página, o botão "Colar texto" e o texto arrastado para a área de envio são convertidos como um arquivo. O texto copiado de um chat de IA, com as marcas do Markdown, sai com títulos, listas e negrito.</li><li><strong>Leitura direta da área de transferência.</strong> O botão "Colar texto" lê o que foi copiado e converte na hora. Sem permissão do navegador, ele abre um campo para colar.</li></ul>
+        </section>
+        <section class="space-y-2">
+          <h4 class="font-semibold text-slate-800">Versão 0.3.0 <span class="font-normal text-slate-500">28 de setembro de 2026</span></h4>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Tela do resultado mais simples.</strong> A parte copiada ganha a marca "Copiada" até a próxima conversão, e o limite do SEI Pro só aparece na parte que não cabe. Com o resultado na tela, a área de envio vira uma faixa baixa.</li><li><strong>Andamento do OCR.</strong> Uma barra mostra o avanço do reconhecimento no documento inteiro, com a página e a porcentagem.</li><li><strong>Avisos do OCR.</strong> O aviso do resultado foi dividido em dois itens curtos, com link para o PDF24.</li></ul>
+        </section>
+        <section class="space-y-2">
+          <h4 class="font-semibold text-slate-800">Versão 0.2.0 <span class="font-normal text-slate-500">27 de setembro de 2026</span></h4>
+          <p>Primeira versão publicada neste repositório.</p>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Conversão para o padrão do SEI.</strong> Converte .docx, .odt, .md, .txt e .pdf em HTML com as classes de parágrafo do editor do SEI, e divide em partes o documento que passa do limite do SEI Pro.</li><li><strong>Na página ou no computador.</strong> A conversão roda no navegador, sem enviar o documento, e funciona sem rede depois da primeira visita. O comando conversorsei faz o mesmo na linha de comando.</li><li><strong>Ajustes a pedido.</strong> O resultado oferece omitir o cabeçalho antes do item 1 e converter como citação os parágrafos recuados e em fonte menor.</li><li><strong>OCR de PDF digitalizado.</strong> No PDF sem camada de texto, o botão "Reconhecer texto (OCR)" reconhece as páginas em português no próprio navegador.</li><li><strong>Endereço próprio.</strong> A página passa a conversorsei.com.br, e os endereços antigos redirecionam para ela.</li><li><strong>Numeração no Chrome.</strong> A prévia deixou de numerar 2.3 logo depois de 2.</li><li><strong>Rodapé.</strong> Links para relatar problema, enviar sugestão e apoiar o projeto por Pix, e o aviso de que o projeto é independente.</li></ul>
+        </section>
+        <!-- novidades:fim -->
+      </div>
+    </div>
+  </div>
+
   <!-- Modal de Pré-visualização do HTML -->
   <div id="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
@@ -415,6 +451,11 @@
         <p class="text-center sm:text-left">
           <span class="font-semibold text-slate-700">Conversor SEI</span>
           <span aria-hidden="true" class="mx-1 text-slate-300">|</span>
+          <!-- A versão vem do CHANGELOG.md, gravada pelo scripts/bundle_web.py -->
+          <button id="btn-novidades" type="button" class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline" title="Ver as novidades de cada versão">
+            <i data-lucide="tag" class="w-3.5 h-3.5"></i>versão <span id="versao-atual">0.5.0</span>
+          </button>
+          <span aria-hidden="true" class="mx-1 text-slate-300">|</span>
           código aberto sob licença MIT
         </p>
         <!-- Relato e sugestão por e-mail, com modelo preenchido, e apoio ao projeto por Pix -->
@@ -444,7 +485,7 @@
   </footer>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=ae3c994890"></script>
+  <script src="app.js?v=3eed7264c1"></script>
 
   <!-- Contagem de acessos, sem cookies. Fica fora do service worker: sem rede, a visita
        apenas não é contada, e a página continua abrindo -->

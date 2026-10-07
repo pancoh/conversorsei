@@ -19,6 +19,7 @@ from conversorsei.formatacao import (
     Formatacao,
     classe_sei_pelo_nome,
     fonte_predominante,
+    linha_curta,
     linhas_de_assinatura,
     paragrafos_entre_aspas,
     pode_ser_linha_de_assinatura,
@@ -492,12 +493,14 @@ def converter_corpo(
     heranca_completa = heranca_completa or heranca
     linhas: list[str] = []
     # Um registro por parágrafo com texto ou tabela, na ordem, para achar o bloco de
-    # assinatura: (índice da linha, candidata, formato, texto)
-    registros: list[tuple[int, bool, Formatacao, str]] = []
+    # assinatura: (índice da linha, candidata, formato, texto, texto da linha curta)
+    registros: list[tuple[int, bool, Formatacao, str, str | None]] = []
     aspas = citacao_entre_aspas(corpo, estilos, heranca) if citacao is not None else set()
 
-    def registrar(candidata: bool = False, formato: Formatacao | None = None, texto: str = "") -> None:
-        registros.append((len(linhas) - 1, candidata, formato or Formatacao(), texto))
+    def registrar(
+        candidata: bool = False, formato: Formatacao | None = None, texto: str = "", curta: str | None = None
+    ) -> None:
+        registros.append((len(linhas) - 1, candidata, formato or Formatacao(), texto, curta))
 
     def visitar(no: ElementTree.Element, dentro_de_lista: bool = False) -> None:
         for filho in no:
@@ -527,12 +530,10 @@ def converter_corpo(
                 else:
                     explicita = classe_explicita(filho.get(_q("text", "style-name")), heranca_completa)
                     linhas.append(linha_com_classe(texto, formato, explicita, citacao, filho in aspas))
-                    candidata = (
-                        not explicita
-                        and not comeca_com_item(texto)
-                        and pode_ser_linha_de_assinatura(desescapar_markdown(texto), formato.alinhamento)
-                    )
-                    registrar(candidata, formato, texto)
+                    visivel = desescapar_markdown(texto)
+                    sem_classe = not explicita and not comeca_com_item(texto)
+                    candidata = sem_classe and pode_ser_linha_de_assinatura(visivel, formato.alinhamento)
+                    registrar(candidata, formato, texto, visivel if sem_classe and linha_curta(visivel) else None)
                 linhas.append("")
             elif tag == _q("table", "table"):
                 md_tabela = tabela_para_markdown(filho, estilos, notas)
@@ -549,8 +550,8 @@ def converter_corpo(
                 visitar(filho, dentro_de_lista=dentro_de_lista)
 
     visitar(corpo)
-    n = linhas_de_assinatura([candidata for _, candidata, _, _ in registros])
-    for indice, _, formato, texto in registros[len(registros) - n :] if n else []:
+    n = linhas_de_assinatura([candidata for _, candidata, _, _, _ in registros], [curta for *_, curta in registros])
+    for indice, _, formato, texto, _ in registros[len(registros) - n :] if n else []:
         linhas[indice] = linha_de_assinatura(texto, formato)
     return linhas
 

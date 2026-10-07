@@ -208,9 +208,13 @@ function semNomesDeArquivo(texto) {
 }
 
 // A marca de versão do app.js, gravada pelo bundle_web.py, identifica a publicação
+// A versão do CHANGELOG.md e a marca do app.js: entre dois lançamentos, a página muda
+// sem mudar de número, e só a marca diz qual código a pessoa estava usando
 function versaoDaPagina() {
   const script = document.querySelector('script[src*="app.js?v="]');
-  return script ? new URL(script.src).searchParams.get('v') : 'desconhecida';
+  const marca = script ? new URL(script.src).searchParams.get('v') : 'desconhecida';
+  const versao = document.getElementById('versao-atual')?.textContent || 'desconhecida';
+  return `${versao} (${marca})`;
 }
 
 function linkDoRelato() {
@@ -327,6 +331,40 @@ document.addEventListener('keydown', (e) => {
   if (indice === -1 || (e.shiftKey && indice === 0) || (!e.shiftKey && indice === focaveis.length - 1)) {
     e.preventDefault();
     focaveis[e.shiftKey ? focaveis.length - 1 : 0].focus();
+  }
+});
+
+// Janela das novidades: abre pela versão do rodapé, fecha no X, no Esc ou no fundo, e
+// devolve o foco ao botão. O histórico já vem no HTML, gravado pelo bundle_web.py
+const novidadesModal = document.getElementById('novidades-modal');
+const btnNovidades = document.getElementById('btn-novidades');
+const novidadesFechar = document.getElementById('novidades-fechar');
+
+function abrirNovidades() {
+  novidadesModal.classList.remove('hidden');
+  document.getElementById('novidades-lista').scrollTop = 0;
+  novidadesFechar.focus();
+}
+
+function fecharNovidades() {
+  if (novidadesModal.classList.contains('hidden')) return;
+  novidadesModal.classList.add('hidden');
+  btnNovidades.focus();
+}
+
+btnNovidades.addEventListener('click', abrirNovidades);
+novidadesFechar.addEventListener('click', fecharNovidades);
+novidadesModal.addEventListener('click', (e) => {
+  if (e.target === novidadesModal) fecharNovidades();
+});
+document.addEventListener('keydown', (e) => {
+  if (novidadesModal.classList.contains('hidden')) return;
+  if (e.key === 'Escape') {
+    fecharNovidades();
+  } else if (e.key === 'Tab') {
+    // O único controle do quadro é o X: o foco não sai dele para a página de trás
+    e.preventDefault();
+    novidadesFechar.focus();
   }
 });
 

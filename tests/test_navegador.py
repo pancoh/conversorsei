@@ -256,6 +256,17 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     pagina.keyboard.press("Escape")
     pagina.locator("#pix-modal").wait_for(state="hidden")
 
+    # A versão do rodapé abre o histórico, e o relato leva a mesma versão
+    versao = pagina.locator("#versao-atual").text_content()
+    assert re.fullmatch(r"\d+\.\d+\.\d+", versao)
+    assert f"Versão da página: {versao} (" in relato
+    pagina.click("#btn-novidades")
+    pagina.locator("#novidades-modal").wait_for(state="visible")
+    assert f"Versão {versao}" in pagina.locator("#novidades-lista").inner_text()
+    pagina.keyboard.press("Escape")
+    pagina.locator("#novidades-modal").wait_for(state="hidden")
+    assert pagina.evaluate("() => document.activeElement.id") == "btn-novidades"
+
     # Um arquivo que não abre mostra o erro com o link de relato, também sem o nome
     pagina.set_input_files(
         "#file-input",

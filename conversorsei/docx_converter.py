@@ -21,12 +21,15 @@ from docx.text.paragraph import Paragraph
 from conversorsei.entrada import FonteDocumento, abrir_binario
 from conversorsei.formatacao import (
     CLASSE_ASSINATURA,
+    ESTILO_NUMERO_LITERAL,
+    RE_MARCA_ASSINATURA,
     CitacaoPorRecuo,
     Formatacao,
     classe_de_tabela_por_formatacao,
     classe_por_formatacao,
     classe_sei_pelo_nome,
     fonte_predominante,
+    linha_curta,
     linhas_de_assinatura,
     maior_tamanho,
     paragrafos_entre_aspas,
@@ -81,6 +84,15 @@ def profundidade_item(texto: str) -> int:
     if n == 1 and not ponto_final:
         return 0
     return n
+
+
+def item_digitado(p: Paragraph, texto: str) -> int:
+    """profundidade_item do parágrafo, ou 0 quando o número veio de uma lista numerada.
+
+    O leitor de HTML escreve o número da lista no texto e marca o parágrafo com
+    ESTILO_NUMERO_LITERAL: o número é do texto, e não um item da numeração do SEI.
+    """
+    return 0 if nome_do_estilo(p) == ESTILO_NUMERO_LITERAL else profundidade_item(texto)
 
 
 # Um "1." no início do parágrafo pode ser título de seção ("1. ASSUNTO") ou parágrafo
@@ -621,19 +633,26 @@ def paragrafo_inline(doc: DocumentoWord, p: Paragraph) -> str:
     return "".join(out)
 
 
-def _linha_de_assinatura(doc: DocumentoWord, p: Paragraph) -> bool:
-    """Indica se o parágrafo pode ser linha do bloco de assinatura.
-
-    Centralizado e curto, sem estilo com nome de classe e fora de título, lista e
-    numeração digitada: esses têm classe própria, que continua valendo no fim do texto.
+def _linha_curta_sem_classe(doc: DocumentoWord, p: Paragraph) -> str | None:
+    """O texto do parágrafo, se ele pode ser linha do bloco de assinatura em qualquer
+    alinhamento: curto, sem estilo com nome de classe e fora de título, lista e numeração
+    digitada. Esses têm classe própria, que continua valendo no fim do texto.
     """
     texto = texto_visivel(p).strip()
-    if not pode_ser_linha_de_assinatura(texto, alinhamento(p)):
-        return False
+    if not linha_curta(texto):
+        return None
     nome_estilo = nome_do_estilo(p)
     if classe_sei_pelo_nome(nome_estilo) or re.search(r"(heading|t[ií]tulo)\s*\d", (nome_estilo or "").lower()):
-        return False
-    return not profundidade_item(texto) and formato_lista_xml(doc, p)[0] is None
+        return None
+    if item_digitado(p, texto) or formato_lista_xml(doc, p)[0] is not None:
+        return None
+    return texto
+
+
+def _linha_de_assinatura(doc: DocumentoWord, p: Paragraph) -> bool:
+    """Indica se o parágrafo pode ser linha do bloco de assinatura pela centralização."""
+    texto = _linha_curta_sem_classe(doc, p)
+    return texto is not None and pode_ser_linha_de_assinatura(texto, alinhamento(p))
 
 
 def bloco_de_assinatura(doc: DocumentoWord) -> set:
@@ -645,16 +664,19 @@ def bloco_de_assinatura(doc: DocumentoWord) -> set:
     """
     elementos: list = []
     candidatas: list[bool] = []
+    curtas: list[str | None] = []
     for filho in _blocos_visiveis(doc.element.body):
         if filho.tag == qn("w:tbl"):
             elementos.append(filho)
             candidatas.append(False)
+            curtas.append(None)
         elif filho.tag == qn("w:p"):
             p = Paragraph(filho, doc)
             if texto_visivel(p).strip():
                 elementos.append(filho)
                 candidatas.append(_linha_de_assinatura(doc, p))
-    n = linhas_de_assinatura(candidatas)
+                curtas.append(_linha_curta_sem_classe(doc, p))
+    n = linhas_de_assinatura(candidatas, curtas)
     return set(elementos[len(elementos) - n :]) if n else set()
 
 
@@ -679,9 +701,8 @@ def citacao_entre_aspas(doc: DocumentoWord) -> set:
     return {elementos[i] for i in paragrafos_entre_aspas(textos)}
 
 
-# Marca da assinatura eletrônica, com ou sem colchetes ou parênteses. Sai sempre no mesmo
-# texto, em itálico, e separa uma assinatura da outra
-RE_MARCA_ASSINATURA = re.compile(r"^[\[(]?\s*assinad[oa]\s+eletronicamente\s*[\])]?\.?$", re.IGNORECASE)
+# A marca da assinatura (RE_MARCA_ASSINATURA) sai sempre no mesmo texto, em itálico, e
+# separa uma assinatura da outra
 MARCA_ASSINATURA = "<em>[Assinado eletronicamente]</em>"
 ABRE_ASSINATURA = f'<p class="{CLASSE_ASSINATURA}">'
 # Linha em branco entre duas assinaturas. O &nbsp; impede o editor do SEI de descartar o
@@ -745,7 +766,7 @@ def converter_paragrafo(
     # Item numerado digitado (1., 1.1., 3.1 ...) tem prioridade: vira Item_NivelN e o
     # SEI renumera sozinho. Fora de tabela apenas.
     texto = texto_visivel(p)
-    prof = 0 if dentro_tabela or explicita else profundidade_item(texto)
+    prof = 0 if dentro_tabela or explicita else item_digitado(p, texto)
     if explicita:
         # Como os títulos do Word, o nível pedido pelo estilo não passa pelo limite de
         # --max-nivel, que vale só para número digitado
@@ -986,7 +1007,7 @@ def abre_numeracao_nivel1(doc: DocumentoWord, p: Paragraph) -> bool:
     """
     if classe_sei_pelo_nome(nome_do_estilo(p)):
         return False
-    if profundidade_item(texto_visivel(p)) == 1:
+    if item_digitado(p, texto_visivel(p)) == 1:
         return True
     fmt, ilvl = formato_lista_xml(doc, p)
     return fmt not in (None, "bullet", "lowerLetter", "upperRoman", "lowerRoman") and (ilvl or 0) == 0
@@ -1032,7 +1053,7 @@ def documento_tem_item_nivel1(doc: DocumentoWord, convencao: str = "titulos") ->
             if explicita == "Item_Nivel1":
                 return True
             continue
-        if convencao == "titulos" and profundidade_item(texto_visivel(p)) == 1:
+        if convencao == "titulos" and item_digitado(p, texto_visivel(p)) == 1:
             return True
         nome_estilo = (nome_do_estilo(p) or "").lower()
         m = re.search(r"(heading|t[ií]tulo)\s*(\d)", nome_estilo)

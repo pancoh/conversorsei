@@ -5,6 +5,7 @@ igual. É o que garante que o HTML do SEI, que traz as mesmas classes, chegue in
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -249,3 +250,65 @@ def test_colado_sem_texto_explica_sem_citar_arquivo():
     )
     assert res["sucesso"] is False
     assert "conteúdo colado" in res["erros"][0]
+
+
+# Lista numerada: o número fica escrito no texto, sem marcador e fora da numeração do SEI
+RE_P = re.compile(r'<(p|li) class="([^"]+)">(.*?)</(?:p|li)>', re.DOTALL)
+
+
+def _paragrafos(html: str, **opcoes) -> list[tuple[str, str, str]]:
+    res = converter_documento_memoria("texto_colado.html", html.encode(), so_corpo=True, colado=True, **opcoes)
+    assert res["sucesso"], res["erros"]
+    return RE_P.findall(res["arquivos"][0]["conteudo"])
+
+
+def test_lista_numerada_sai_com_o_numero_no_texto():
+    html = (
+        "<p>Solicitamos as seguintes informações:</p>"
+        "<ol><li><p>O Ministério possui setor responsável?</p>"
+        '<ol type="a"><li>Em caso afirmativo, informe.</li><li>Em caso negativo, informe.</li></ol></li>'
+        "<li>Quais são as atribuições?</li></ol>"
+        '<ol start="3"><li>Qual é a equipe?</li></ol>'
+        '<ol style="list-style-type: upper-roman"><li>Inciso um.</li><li>Inciso dois.</li></ol>'
+        "<ul><li>Marcador continua marcador.</li></ul>"
+    )
+    paragrafos = _paragrafos(html)
+    textos = [t for _, _, t in paragrafos]
+    assert textos[1:8] == [
+        "1. O Ministério possui setor responsável?",
+        "a) Em caso afirmativo, informe.",
+        "b) Em caso negativo, informe.",
+        "2. Quais são as atribuições?",
+        "3. Qual é a equipe?",
+        "I - Inciso um.",
+        "II - Inciso dois.",
+    ]
+    # Nem marcador nem Item_Nivel: o "1." é texto, e o documento não ganha numeração
+    assert {c for _, c, _ in paragrafos[1:8]} == {"Texto_Justificado"}
+    assert paragrafos[8][0] == "li"
+
+
+def test_lista_numerada_dentro_da_citacao_entre_aspas():
+    html = (
+        '<p>"Pedido transcrito:</p>'
+        "<ol><li>O Ministério possui setor responsável?</li><li>Quais são as atribuições?</li></ol>"
+        '<p>Fim do pedido."</p><p>Resposta da unidade.</p>'
+    )
+    paragrafos = _paragrafos(html, citacao_por_recuo=True)
+    assert [(c, t) for _, c, t in paragrafos] == [
+        ("Citação", '"Pedido transcrito:'),
+        ("Citação", "1. O Ministério possui setor responsável?"),
+        ("Citação", "2. Quais são as atribuições?"),
+        ("Citação", 'Fim do pedido."'),
+        ("Texto_Justificado", "Resposta da unidade."),
+    ]
+
+
+@pytest.mark.parametrize(
+    "posicao, tipo, esperado",
+    [(1, "1", "1."), (12, "1", "12."), (2, "a", "b)"), (27, "a", "aa)"), (3, "A", "C)"), (4, "I", "IV -"), (9, "i", "ix -")],
+)
+def test_numero_do_item(posicao, tipo, esperado):
+    from conversorsei.html_converter import numero_do_item
+
+    assert numero_do_item(posicao, tipo) == esperado

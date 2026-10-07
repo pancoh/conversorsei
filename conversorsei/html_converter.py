@@ -22,9 +22,11 @@ from html.parser import HTMLParser
 
 from conversorsei.entrada import FonteDocumento, ler_bytes, nome_da_fonte
 from conversorsei.formatacao import (
+    ESTILO_NUMERO_LITERAL,
     CitacaoPorRecuo,
     Formatacao,
     classe_sei_pelo_nome,
+    linha_curta,
     linhas_de_assinatura,
     pode_ser_linha_de_assinatura,
 )
@@ -114,6 +116,37 @@ class No:
     tag: str
     attrs: dict[str, str] = field(default_factory=dict)
     filhos: list[No | str] = field(default_factory=list)
+
+
+# Tipo de numeração de <ol> (o atributo type) pelo list-style-type do CSS
+TIPO_POR_ESTILO_DE_LISTA = {
+    "lower-alpha": "a",
+    "lower-latin": "a",
+    "upper-alpha": "A",
+    "upper-latin": "A",
+    "lower-roman": "i",
+    "upper-roman": "I",
+}
+ROMANOS = ((1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"),
+           (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"))  # fmt: skip
+
+
+def numero_do_item(posicao: int, tipo: str) -> str:
+    """O número de um item de <ol>, como se escreve no texto: "1.", "a)", "A)", "I -"."""
+    if tipo in ("a", "A") and posicao > 0:
+        letras = ""
+        while posicao > 0:
+            posicao, resto = divmod(posicao - 1, 26)
+            letras = chr(ord("a") + resto) + letras
+        return f"{letras.upper() if tipo == 'A' else letras})"
+    if tipo in ("i", "I") and posicao > 0:
+        romano = ""
+        for valor, simbolo in ROMANOS:
+            while posicao >= valor:
+                romano += simbolo
+                posicao -= valor
+        return f"{romano if tipo == 'I' else romano.lower()} -"
+    return f"{posicao}."
 
 
 class MontadorDeArvore(HTMLParser):
@@ -296,15 +329,17 @@ class LeitorHtml:
 
     def __init__(self) -> None:
         self.linhas: list[str] = []
-        # (índice da linha, candidata, formato, texto) de cada parágrafo ou tabela, para
-        # achar o bloco de assinatura, como no ODT
-        self.registros: list[tuple[int, bool, Formatacao, str]] = []
+        # (índice da linha, candidata, formato, texto, texto da linha curta) de cada
+        # parágrafo ou tabela, para achar o bloco de assinatura, como no ODT
+        self.registros: list[tuple[int, bool, Formatacao, str, str | None]] = []
         self.imagens = False
         self.mescladas_entre_linhas = False
         self.textos_do_sei = 0
 
-    def _registrar(self, candidata: bool = False, formato: Formatacao | None = None, texto: str = "") -> None:
-        self.registros.append((len(self.linhas) - 1, candidata, formato or Formatacao(), texto))
+    def _registrar(
+        self, candidata: bool = False, formato: Formatacao | None = None, texto: str = "", curta: str | None = None
+    ) -> None:
+        self.registros.append((len(self.linhas) - 1, candidata, formato or Formatacao(), texto, curta))
 
     # Texto dos parágrafos
 
@@ -411,10 +446,9 @@ class LeitorHtml:
             texto = riscar_inteiro(texto)
         explicita = "Citação" if contexto.citacao else (classe_do_no(dono) if dono is not None else None)
         self.linhas.append(linha_com_classe(texto, formato, explicita))
-        candidata = (
-            not explicita and not comeca_com_item(texto) and pode_ser_linha_de_assinatura(visivel, formato.alinhamento)
-        )
-        self._registrar(candidata, formato, texto)
+        sem_classe = not explicita and not comeca_com_item(texto)
+        candidata = sem_classe and pode_ser_linha_de_assinatura(visivel, formato.alinhamento)
+        self._registrar(candidata, formato, texto, visivel if sem_classe and linha_curta(visivel) else None)
         self.linhas.append("")
 
     def _titulo(self, no: No, nivel: int) -> None:
@@ -437,11 +471,15 @@ class LeitorHtml:
         self.linhas.append("")
 
     def _lista(self, no: No, nivel: int) -> None:
-        """Itens de lista, numerada ou não, como marcadores, na forma do leitor de ODT.
+        """Itens de lista com marcadores, na forma do leitor de ODT.
 
         Os itens saem colados, com dois espaços por nível: uma linha em branco entre
-        eles quebraria a lista em várias no Markdown.
+        eles quebraria a lista em várias no Markdown. A lista numerada vai para
+        _lista_numerada.
         """
+        if no.tag == "ol":
+            self._lista_numerada(no, nivel)
+            return
         for filho in no.filhos:
             if isinstance(filho, str):
                 continue
@@ -459,6 +497,46 @@ class LeitorHtml:
             for sub in filho.filhos:
                 if isinstance(sub, No) and sub.tag in LISTAS:
                     self._lista(sub, nivel + 1)
+
+    def _lista_numerada(self, no: No, nivel: int) -> None:
+        """Itens de <ol> como parágrafos com o número escrito no texto ("1.", "a)").
+
+        O SEI não tem lista numerada: as classes numeradas entram na sequência dos itens
+        do próprio documento, e o Item_Nivel1 sai em caixa alta com tarja cinza. A lista
+        colada costuma ser texto citado (perguntas de um pedido, incisos de uma norma),
+        e o número escrito nunca se mistura com a numeração do documento. O estilo
+        ESTILO_NUMERO_LITERAL impede o docx_converter de ler o "1." como item digitado.
+        """
+        tipo = no.attrs.get("type") or TIPO_POR_ESTILO_DE_LISTA.get(_estilo(no).get("list-style-type", ""), "1")
+        try:
+            posicao = int(no.attrs.get("start") or 1)
+        except ValueError:
+            posicao = 1
+        for filho in no.filhos:
+            if isinstance(filho, str):
+                continue
+            if filho.tag in LISTAS:
+                self._lista(filho, nivel + 1)
+                continue
+            try:
+                posicao = int(filho.attrs.get("value") or posicao)
+            except ValueError:
+                pass
+            proprio = [f for f in filho.filhos if not (isinstance(f, No) and f.tag in LISTAS)]
+            trechos: list[Enfase] = []
+            texto = self._texto(proprio, trechos)
+            if texto:
+                if all(t.riscado for t in trechos):
+                    texto = riscar_inteiro(texto)
+                texto = f"{numero_do_item(posicao, tipo)} {texto}"
+                self.linhas.append(linha_com_classe(texto, Formatacao(), ESTILO_NUMERO_LITERAL))
+                self._registrar()
+                self.linhas.append("")
+            posicao += 1
+            for sub in filho.filhos:
+                if isinstance(sub, No) and sub.tag in LISTAS:
+                    self._lista(sub, nivel + 1)
+                    self.linhas.append("")
 
     def _linhas_da_tabela(self, tabela: No) -> list[No]:
         linhas = []
@@ -515,8 +593,10 @@ class LeitorHtml:
 
     def markdown(self, raiz: No) -> str:
         self.blocos(raiz, Contexto())
-        n = linhas_de_assinatura([candidata for _, candidata, _, _ in self.registros])
-        for indice, _, formato, texto in self.registros[len(self.registros) - n :] if n else []:
+        n = linhas_de_assinatura(
+            [candidata for _, candidata, _, _, _ in self.registros], [curta for *_, curta in self.registros]
+        )
+        for indice, _, formato, texto, _ in self.registros[len(self.registros) - n :] if n else []:
             self.linhas[indice] = linha_de_assinatura(texto, formato)
         return re.sub(r"\n{3,}", "\n\n", "\n".join(self.linhas)).strip()
 

@@ -27,6 +27,7 @@ from conversorsei.docx_converter import converter_docx_para_blocos, profundidade
 from conversorsei.entrada import FonteDocumento, ler_bytes
 from conversorsei.formatacao import (
     CLASSE_ASSINATURA,
+    ESTILO_NUMERO_LITERAL,
     CitacaoPorRecuo,
     Formatacao,
     classe_por_formatacao,
@@ -407,8 +408,10 @@ def aplicar_classe_sei(doc: DocumentoWord, p, classe: str) -> None:
 
     Nome que não é classe do SEI é ignorado: "Strong" é estilo de caractere do Word e
     derrubaria a conversão, e "Heading 1" ou "Quote" mudariam a classe por outro caminho.
+    A exceção é ESTILO_NUMERO_LITERAL, que não é classe: só diz ao docx_converter que o
+    número no começo do parágrafo é texto, e não item digitado.
     """
-    classe_valida = classe_sei_pelo_nome(classe)
+    classe_valida = ESTILO_NUMERO_LITERAL if classe == ESTILO_NUMERO_LITERAL else classe_sei_pelo_nome(classe)
     if not classe_valida:
         return
     classe = classe_valida

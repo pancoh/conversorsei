@@ -1,10 +1,13 @@
 """Testes do empacotador do bundle web (scripts/bundle_web.py)."""
 import importlib.util
+import sys
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("bundle_web", RAIZ / "scripts" / "bundle_web.py")
 bundle_web = importlib.util.module_from_spec(spec)
+# O dataclass do script procura o módulo em sys.modules
+sys.modules["bundle_web"] = bundle_web
 spec.loader.exec_module(bundle_web)
 
 

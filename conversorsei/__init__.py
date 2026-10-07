@@ -46,7 +46,7 @@ from conversorsei.pdf_converter import (
 from conversorsei.validador import validar_arquivo_sei, validar_html_sei
 from conversorsei.web import converter_documento_memoria, converter_memoria_json
 
-__version__ = "0.2.0"
+__version__ = "0.5.0"
 __all__ = [
     "EXTENSOES_SUPORTADAS",
     "ArquivoSEI",

@@ -37,6 +37,9 @@ RECUO_MINIMO_CITACAO_CM = 2.0
 # Perto do que cabe numa linha do SEI (Calibri 12 pt). Uma fala curta entre aspas fica no
 # texto; a citação que passa de uma linha costuma ir em parágrafo próprio
 MINIMO_LETRAS_CITACAO_ENTRE_ASPAS = 100
+# Estilo interno do DOCX intermediário (não é classe do SEI): o parágrafo traz escrito o
+# número de uma lista numerada, que o docx_converter não deve ler como item digitado
+ESTILO_NUMERO_LITERAL = "Conversor_Numero_Literal"
 # Aspas de abertura e a de fechamento que corresponde a cada uma
 ASPAS = {'"': '"', "“": "”", "«": "»"}
 # Depois das aspas, só pontuação e a referência entre parênteses: "..." (SILVA, 2020, p. 3).
@@ -286,17 +289,32 @@ LIMITE_PALAVRAS_ASSINATURA = 12
 MINIMO_LINHAS_ASSINATURA = 2
 
 
+# Marca da assinatura eletrônica, com ou sem colchetes ou parênteses
+RE_MARCA_ASSINATURA = re.compile(r"^[\[(]?\s*assinad[oa]\s+eletronicamente\s*[\])]?\.?$", re.IGNORECASE)
+
+
+def linha_curta(texto: str) -> bool:
+    """Curta o bastante para ser nome, cargo ou marca de assinatura."""
+    return 0 < len(texto.split()) <= LIMITE_PALAVRAS_ASSINATURA
+
+
 def pode_ser_linha_de_assinatura(texto: str, alinhamento: str | None) -> bool:
     """Centralizada e curta. Quem chama exclui título, lista, item e estilo explícito."""
-    return alinhamento == "center" and 0 < len(texto.split()) <= LIMITE_PALAVRAS_ASSINATURA
+    return alinhamento == "center" and linha_curta(texto)
 
 
-def linhas_de_assinatura(candidatas: list[bool]) -> int:
+def linhas_de_assinatura(candidatas: list[bool], curtas: list[str | None] | None = None) -> int:
     """Quantas linhas do fim formam o bloco de assinatura.
 
     Recebe, na ordem do documento, uma entrada por parágrafo com texto ou tabela (tabela
     é sempre falsa) e conta as verdadeiras do fim. Documento inteiro de linhas candidatas
     não tem bloco: seria o texto todo, e não uma assinatura.
+
+    `curtas` traz, na mesma ordem, o texto de cada linha curta e sem classe própria, em
+    qualquer alinhamento (None nas outras). Com ela, o bloco também pode começar na marca
+    "[assinado eletronicamente]" e ir até o fim: o texto colado de um chat ou de um .txt
+    não tem centralização, mas a marca, o nome e o cargo dizem o que é a assinatura. O
+    "Atenciosamente," antes da marca fica de fora.
     """
     n = 0
     for candidata in reversed(candidatas):
@@ -304,5 +322,17 @@ def linhas_de_assinatura(candidatas: list[bool]) -> int:
             break
         n += 1
     if n == len(candidatas) or n < MINIMO_LINHAS_ASSINATURA:
-        return 0
+        n = 0
+    if curtas:
+        finais = 0
+        for texto in reversed(curtas):
+            if texto is None:
+                break
+            finais += 1
+        trecho = curtas[len(curtas) - finais :]
+        marca = next((i for i, texto in enumerate(trecho) if RE_MARCA_ASSINATURA.match(texto or "")), None)
+        if marca is not None:
+            pela_marca = finais - marca
+            if MINIMO_LINHAS_ASSINATURA <= pela_marca < len(curtas):
+                n = max(n, pela_marca)
     return n
