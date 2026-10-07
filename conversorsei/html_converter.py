@@ -22,6 +22,7 @@ from html.parser import HTMLParser
 
 from conversorsei.entrada import FonteDocumento, ler_bytes, nome_da_fonte
 from conversorsei.formatacao import (
+    CitacaoPorRecuo,
     Formatacao,
     classe_sei_pelo_nome,
     linhas_de_assinatura,
@@ -561,7 +562,11 @@ def extrair_markdown_html(fonte: FonteDocumento, avisos: list[str] | None = None
 
 
 def converter_html_para_blocos(
-    fonte: FonteDocumento, max_nivel: int = 4, avisos: list[str] | None = None, colado: bool = False
+    fonte: FonteDocumento,
+    max_nivel: int = 4,
+    avisos: list[str] | None = None,
+    colado: bool = False,
+    citacao: CitacaoPorRecuo | None = None,
 ) -> list[str]:
     """Converte um arquivo HTML para blocos HTML SEI.
 
@@ -569,4 +574,4 @@ def converter_html_para_blocos(
     <h1> sem número é o título do documento, como o "#" num .md.
     """
     markdown = extrair_markdown_html(fonte, avisos=avisos, colado=colado)
-    return converter_texto_md_para_blocos(markdown, max_nivel=max_nivel)
+    return converter_texto_md_para_blocos(markdown, max_nivel=max_nivel, citacao=citacao)

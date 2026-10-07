@@ -568,6 +568,8 @@ def converter_odt_para_blocos(
 ) -> list[str]:
     """Converte um arquivo ODT para blocos HTML SEI."""
     markdown = extrair_markdown_odt(caminho_odt, citacao=citacao, avisos=avisos)
+    # Sem `citacao`: as duas regras já passaram por linha_com_classe, e o parágrafo
+    # sugerido e deixado como texto seria contado de novo pela regra das aspas
     return converter_texto_md_para_blocos(markdown, max_nivel=max_nivel, extraido=True)
 
 

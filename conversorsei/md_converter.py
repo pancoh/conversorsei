@@ -105,6 +105,18 @@ def desescapar_markdown(texto: str) -> str:
     return RE_ESCAPE_MD.sub(r"\1", texto).replace(MARCA_QUEBRA_ODT, " ")
 
 
+def texto_sem_marcacao(texto: str) -> str:
+    """Texto de uma linha de Markdown sem negrito, itálico, riscado e links.
+
+    Serve à regra que olha o começo e o fim do parágrafo (a citação entre aspas): uma
+    citação em itálico no ODT chega como "*“...”*", e o asterisco esconderia as aspas.
+    A quebra de linha do ODT volta a ser quebra, porque conta como linha da citação.
+    """
+    partes = parse_markdown_inline(proteger_escapes(texto))
+    simples = "".join(p[2] if p[0] == "link" else p[1] for p in partes)
+    return restaurar_escapes(simples).replace(MARCA_QUEBRA_ODT, "\n")
+
+
 def proteger_escapes(texto: str) -> str:
     """Substitui o caractere escapado por uma marca neutra à leitura da marcação inline."""
     return RE_ESCAPE_MD.sub(lambda m: f"{SENTINELA}{ord(m.group(1))}{SENTINELA}", texto)
@@ -465,7 +477,7 @@ def linha_com_classe(
         formato = replace(formato, maiusculas=formato.maiusculas or texto_em_maiusculas(visivel))
         classe = classe_por_formatacao(formato)
         if not classe and citacao is not None:
-            classe = citacao.classe(formato, visivel.replace("~~", ""))
+            classe = citacao.classe(formato, texto_sem_marcacao(texto))
         if not classe:
             classe = CLASSE_POR_ALINHAMENTO.get(formato.alinhamento or "")
     if not classe:
@@ -761,18 +773,23 @@ def markdown_para_docx(md_path: str | Path, docx_path: str | Path) -> Path:
 
 
 def converter_texto_md_para_blocos(
-    conteudo: str, max_nivel: int = 4, estendido: bool = True, extraido: bool = False
+    conteudo: str,
+    max_nivel: int = 4,
+    estendido: bool = True,
+    extraido: bool = False,
+    citacao: CitacaoPorRecuo | None = None,
 ) -> list[str]:
     """Converte texto Markdown em blocos HTML SEI passando o DOCX intermediário em memória.
 
     O DOCX é etapa interna do pipeline, e não um arquivo que alguém vá abrir, então
     não precisa ir ao disco. Quem entra por texto (o conversor de PDF) chega aqui
-    direto, sem escrever nem o .md nem o .docx temporários.
+    direto, sem escrever nem o .md nem o .docx temporários. O DOCX montado aqui não tem
+    recuo nem fonte menor: de `citacao`, só vale a regra das aspas.
     """
     buffer = io.BytesIO()
     montar_docx_de_markdown(conteudo, estendido, extraido).save(buffer)
     buffer.seek(0)
-    return converter_docx_para_blocos(buffer, max_nivel=max_nivel)
+    return converter_docx_para_blocos(buffer, max_nivel=max_nivel, citacao=citacao)
 
 
 def decodificar_texto(conteudo: bytes, estendido: bool = True, avisos: list[str] | None = None) -> str:
@@ -859,13 +876,17 @@ def avisar_marcacoes_nao_suportadas(conteudo: str, avisos: list[str]) -> str:
 
 
 def converter_md_para_blocos(
-    md_path: FonteDocumento, max_nivel: int = 4, estendido: bool = True, avisos: list[str] | None = None
+    md_path: FonteDocumento,
+    max_nivel: int = 4,
+    estendido: bool = True,
+    avisos: list[str] | None = None,
+    citacao: CitacaoPorRecuo | None = None,
 ) -> list[str]:
     """Converte Markdown (arquivo ou conteúdo em memória) para blocos HTML SEI."""
     conteudo = decodificar_texto(ler_bytes(md_path), estendido=estendido, avisos=avisos)
     if estendido:
         conteudo = avisar_marcacoes_nao_suportadas(conteudo, avisos if avisos is not None else [])
-    return converter_texto_md_para_blocos(conteudo, max_nivel=max_nivel, estendido=estendido)
+    return converter_texto_md_para_blocos(conteudo, max_nivel=max_nivel, estendido=estendido, citacao=citacao)
 
 
 def converter_md_para_html(md_path: FonteDocumento, max_nivel: int = 4) -> str:

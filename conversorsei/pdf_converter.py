@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 from conversorsei.entrada import FonteDocumento, abrir_binario, nome_da_fonte
+from conversorsei.formatacao import CitacaoPorRecuo
 from conversorsei.md_converter import converter_texto_md_para_blocos, escapar_markdown
 
 # ---------------------------------------------------------------------------
@@ -237,12 +238,16 @@ def estruturar_texto_para_markdown(texto: str) -> str:
     return "\n".join(md_linhas)
 
 
-def converter_pdf_para_blocos(pdf_path: FonteDocumento, max_nivel: int = 4) -> list[str]:
+def converter_pdf_para_blocos(
+    pdf_path: FonteDocumento, max_nivel: int = 4, citacao: CitacaoPorRecuo | None = None
+) -> list[str]:
     """Extrai, limpa, estrutura e converte um arquivo PDF para blocos HTML SEI."""
-    return converter_texto_de_pdf_para_blocos(extrair_texto_pdf(pdf_path), max_nivel=max_nivel)
+    return converter_texto_de_pdf_para_blocos(extrair_texto_pdf(pdf_path), max_nivel=max_nivel, citacao=citacao)
 
 
-def converter_texto_de_pdf_para_blocos(texto_bruto: str, max_nivel: int = 4) -> list[str]:
+def converter_texto_de_pdf_para_blocos(
+    texto_bruto: str, max_nivel: int = 4, citacao: CitacaoPorRecuo | None = None
+) -> list[str]:
     """Converte o texto de um PDF, já extraído, para blocos HTML SEI.
 
     Separado da extração porque o texto pode vir de fora: na web, o OCR do navegador
@@ -251,7 +256,7 @@ def converter_texto_de_pdf_para_blocos(texto_bruto: str, max_nivel: int = 4) -> 
     """
     texto_limpo = limpar_boilerplate_sei(texto_bruto)
     md_content = estruturar_texto_para_markdown(texto_limpo)
-    return converter_texto_md_para_blocos(md_content, max_nivel=max_nivel, extraido=True)
+    return converter_texto_md_para_blocos(md_content, max_nivel=max_nivel, extraido=True, citacao=citacao)
 
 
 def converter_pdf_para_html(pdf_path: FonteDocumento, max_nivel: int = 4) -> str:

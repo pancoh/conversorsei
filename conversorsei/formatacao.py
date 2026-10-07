@@ -11,13 +11,14 @@ que tentam adivinhar a intenção por medida (ementa pelo recuo, código pela fo
 erravam em documentos comuns (assinatura recuada, documento inteiro em Courier) e
 ficaram de fora: essas classes vêm pelo nome do estilo ou pelo Markdown.
 
-A citação pelo recuo e pela fonte menor é a exceção, e só vale a pedido
-(CitacaoPorRecuo). Documento real quase nunca usa estilo, e a citação costuma vir só
-recuada e em fonte menor. A conversão conta esses parágrafos e deixa quem converte
+A citação pela forma é a exceção, e só vale a pedido (CitacaoPorRecuo). Documento
+real quase nunca usa estilo: a citação costuma vir recuada e em fonte menor, ou como um
+parágrafo inteiro entre aspas. A conversão conta esses parágrafos e deixa quem converte
 decidir: a interface oferece a troca, em vez de a regra adivinhar sozinha.
 """
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -33,6 +34,13 @@ MINIMO_LETRAS_MAIUSCULAS = 3
 # A ABNT pede 4 cm para a citação longa. Metade disso já não acontece por acaso num
 # parágrafo comum, e deixa folga para modelos com recuo menor
 RECUO_MINIMO_CITACAO_CM = 2.0
+# Perto do que cabe numa linha do SEI (Calibri 12 pt). Uma fala curta entre aspas fica no
+# texto; a citação que passa de uma linha costuma ir em parágrafo próprio
+MINIMO_LETRAS_CITACAO_ENTRE_ASPAS = 100
+# Aspas de abertura e a de fechamento que corresponde a cada uma
+ASPAS = {'"': '"', "“": "”", "«": "»"}
+# Depois das aspas, só pontuação e a referência entre parênteses: "..." (SILVA, 2020, p. 3).
+RE_DEPOIS_DAS_ASPAS = re.compile(r"[\s.,;:]*(?:\([^()]*\)[\s.,;:]*)?")
 
 
 @dataclass
@@ -160,28 +168,55 @@ def parece_citacao(f: Formatacao, fonte_do_corpo: float | None) -> bool:
     )
 
 
+def parece_citacao_entre_aspas(f: Formatacao, texto: str) -> bool:
+    """Indica se o parágrafo é uma citação inteira entre aspas que passa de uma linha.
+
+    As aspas abrem o parágrafo e fecham no fim dele; depois delas só cabem pontuação e a
+    referência entre parênteses. Aspas fechadas no meio ("A" e "B") são falas curtas
+    dentro do texto, e não uma citação. Uma quebra de linha dentro das aspas basta para
+    passar de uma linha. Centralizado ou à direita fica de fora, como na regra do recuo.
+    """
+    texto = texto.strip()
+    if f.alinhamento not in (None, "left", "justify") or not texto or texto[0] not in ASPAS:
+        return False
+    fecha = ASPAS[texto[0]]
+    fim = texto.rfind(fecha)
+    if fim <= 0 or not RE_DEPOIS_DAS_ASPAS.fullmatch(texto[fim + 1 :]):
+        return False
+    miolo = texto[1:fim].strip()
+    if fecha in miolo:
+        return False
+    return "\n" in miolo or len(miolo) >= MINIMO_LETRAS_CITACAO_ENTRE_ASPAS
+
+
 @dataclass
 class CitacaoPorRecuo:
-    """Pedido e contagem da citação pelo recuo e pela fonte menor.
+    """Pedido e contagem da citação pela forma: recuo com fonte menor, ou entre aspas.
 
-    Quem converte cria o objeto e diz se a regra se aplica (`aplicar`). O leitor do
+    O nome vem da primeira regra; a das aspas veio depois e segue o mesmo pedido.
+    Quem converte cria o objeto e diz se as regras se aplicam (`aplicar`). O leitor do
     formato preenche `fonte_do_corpo` antes de percorrer o documento e conta cada
-    parágrafo com forma de citação em `encontradas`, aplicando a classe ou não. A
-    contagem é o que permite à interface oferecer a troca quando a regra está desligada.
-    O início de cada parágrafo fica em `trechos`, para quem decide ver o que muda sem
-    procurar os parágrafos na prévia.
+    parágrafo com forma de citação, aplicando a classe ou não: em `encontradas` o
+    recuado em fonte menor e em `entre_aspas` o parágrafo inteiro entre aspas. As duas
+    contagens ficam separadas para a interface dizer por que sugere a troca. O início
+    de cada parágrafo fica em `trechos`, na ordem do documento, para quem decide ver o
+    que muda sem procurar os parágrafos na prévia.
     """
 
     aplicar: bool = False
     fonte_do_corpo: float | None = None
     encontradas: int = 0
+    entre_aspas: int = 0
     trechos: list[str] = field(default_factory=list)
 
     def classe(self, f: Formatacao, texto: str = "") -> str | None:
         """Conta o parágrafo com forma de citação e devolve "Citação" só se pedida."""
-        if not parece_citacao(f, self.fonte_do_corpo):
+        if parece_citacao(f, self.fonte_do_corpo):
+            self.encontradas += 1
+        elif parece_citacao_entre_aspas(f, texto):
+            self.entre_aspas += 1
+        else:
             return None
-        self.encontradas += 1
         self.trechos.append(trecho_inicial(texto))
         return "Citação" if self.aplicar else None
 

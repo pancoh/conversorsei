@@ -84,8 +84,10 @@ class ResultadoMemoria:
     sucesso: bool = True
     erros: list[str] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
-    # Parágrafos com forma de citação (recuo e fonte menor), convertidos ou não
+    # Parágrafos com forma de citação, convertidos ou não: recuados e em fonte menor,
+    # ou inteiros entre aspas
     citacoes_por_recuo: int = 0
+    citacoes_entre_aspas: int = 0
     # Início de cada um desses parágrafos, na ordem do documento
     citacoes_trechos: list[str] = field(default_factory=list)
     # Início de cada parágrafo antes do item 1 (o cabeçalho), omitido ou não
@@ -99,8 +101,10 @@ class ResultadoConversao:
     sucesso: bool = True
     erros: list[str] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
-    # Parágrafos com forma de citação (recuo e fonte menor), convertidos ou não
+    # Parágrafos com forma de citação, convertidos ou não: recuados e em fonte menor,
+    # ou inteiros entre aspas
     citacoes_por_recuo: int = 0
+    citacoes_entre_aspas: int = 0
     # Início de cada um desses parágrafos, na ordem do documento
     citacoes_trechos: list[str] = field(default_factory=list)
     # Início de cada parágrafo antes do item 1 (o cabeçalho), omitido ou não
@@ -118,8 +122,9 @@ def extrair_blocos_de_fonte(
     """Extrai os blocos SEI de um documento, pelo formato indicado no sufixo.
 
     A fonte pode ser um caminho ou o conteúdo em memória, o que permite à interface web
-    converter os bytes que vêm do navegador sem gravar arquivo temporário. `citacao` só
-    tem efeito em .docx e .odt: Markdown, texto e PDF não têm recuo nem fonte.
+    converter os bytes que vêm do navegador sem gravar arquivo temporário. Em `citacao`,
+    a regra do recuo só tem efeito em .docx e .odt (Markdown, texto, HTML e PDF não têm
+    recuo nem fonte); a das aspas vale em todos.
     """
     sufixo = sufixo.lower()
 
@@ -127,13 +132,15 @@ def extrair_blocos_de_fonte(
         return converter_docx_para_blocos(fonte, max_nivel=max_nivel, citacao=citacao, avisos=avisos)
     elif sufixo in {".md", ".txt"}:
         # .txt não é Markdown: ">", "```" e "~~" ali são texto
-        return converter_md_para_blocos(fonte, max_nivel=max_nivel, estendido=sufixo == ".md", avisos=avisos)
+        return converter_md_para_blocos(
+            fonte, max_nivel=max_nivel, estendido=sufixo == ".md", avisos=avisos, citacao=citacao
+        )
     elif sufixo == ".pdf":
-        return converter_pdf_para_blocos(fonte, max_nivel=max_nivel)
+        return converter_pdf_para_blocos(fonte, max_nivel=max_nivel, citacao=citacao)
     elif sufixo == ".odt":
         return converter_odt_para_blocos(fonte, max_nivel=max_nivel, citacao=citacao, avisos=avisos)
     elif sufixo in EXTENSOES_HTML:
-        return converter_html_para_blocos(fonte, max_nivel=max_nivel, avisos=avisos, colado=colado)
+        return converter_html_para_blocos(fonte, max_nivel=max_nivel, avisos=avisos, colado=colado, citacao=citacao)
     elif sufixo in FORMATOS_RETIRADOS:
         raise ValueError(FORMATOS_RETIRADOS[sufixo])
     else:
@@ -314,6 +321,7 @@ def converter_documento(
         resultado.erros.append(mensagem_erro_de_extracao(p_in.name, e))
         return resultado
     resultado.citacoes_por_recuo = citacao.encontradas
+    resultado.citacoes_entre_aspas = citacao.entre_aspas
     resultado.citacoes_trechos = citacao.trechos
 
     if not blocos:
@@ -403,7 +411,7 @@ def converter_bytes(
                 raise RuntimeError(
                     "o OCR não reconheceu texto nas páginas. Confira se a digitalização está legível."
                 )
-            blocos = converter_texto_de_pdf_para_blocos(texto_reconhecido, max_nivel=max_nivel)
+            blocos = converter_texto_de_pdf_para_blocos(texto_reconhecido, max_nivel=max_nivel, citacao=citacao)
             avisos_extracao.extend(AVISOS_OCR)
         else:
             with closing(StreamNomeado(conteudo, origem.name)) as fonte:
@@ -415,6 +423,7 @@ def converter_bytes(
         resultado.erros.append(mensagem_erro_de_extracao(origem.name, e))
         return resultado
     resultado.citacoes_por_recuo = citacao.encontradas
+    resultado.citacoes_entre_aspas = citacao.entre_aspas
     resultado.citacoes_trechos = citacao.trechos
 
     if not blocos:

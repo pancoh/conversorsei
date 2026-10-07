@@ -79,8 +79,10 @@ def converter_documento_memoria(
         "arquivos": arquivos,
         "total_partes": len(arquivos),
         "limite_kb": LIMITE_SEI_BYTES // BYTES_POR_KB,
-        # Com a opção desligada, a interface usa a contagem para oferecer a troca
+        # Com a opção desligada, a interface usa a contagem para oferecer a troca. As duas
+        # formas vêm separadas para a interface dizer por que sugere a citação
         "citacoes_por_recuo": resultado.citacoes_por_recuo,
+        "citacoes_entre_aspas": resultado.citacoes_entre_aspas,
         # O início de cada um, para quem decide ver o que muda antes de converter
         "citacoes_trechos": resultado.citacoes_trechos,
         # O que vem antes do item 1, omitido ou não: a interface oferece a troca

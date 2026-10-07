@@ -9,7 +9,7 @@ let origemColada = false;
 let emLote = false;
 // Arquivos da última seleção, para converter de novo quando a opção de citação muda
 let ultimosArquivos = [];
-// Citação pelo recuo: desligada a cada seleção nova, ligada só pelo botão do resultado
+// Citação pela forma (recuo ou aspas): desligada a cada seleção nova, ligada só pelo botão do resultado
 let citacaoPorRecuo = false;
 // Cabeçalho antes do item 1: mantido a cada seleção nova, omitido só pelo botão do resultado
 let omitirCabecalho = false;
@@ -657,7 +657,7 @@ fileInput.addEventListener('change', (e) => {
   }
 });
 
-// Documentos escolhidos agora começam sem a citação pelo recuo e com o cabeçalho: as
+// Documentos escolhidos agora começam sem a citação pela forma e com o cabeçalho: as
 // opções valem para a seleção em que a pessoa clicou no botão, e não para as seguintes
 function novaSelecao(files) {
   citacaoPorRecuo = false;
@@ -667,7 +667,7 @@ function novaSelecao(files) {
   processFiles(files);
 }
 
-// Liga ou desliga a citação pelo recuo e converte de novo os mesmos arquivos
+// Liga ou desliga a citação pela forma e converte de novo os mesmos arquivos
 btnCitacao.addEventListener('click', () => {
   if (ultimosArquivos.length === 0) return;
   citacaoPorRecuo = !citacaoPorRecuo;
@@ -733,6 +733,7 @@ async function processFiles(files) {
   const avisos = [];
   const falhas = [];
   let citacoes = 0;
+  let citacoesEntreAspas = 0;
   let documentosComCitacao = 0;
   const trechos = [];
   let cabecalhos = 0;
@@ -758,8 +759,9 @@ async function processFiles(files) {
       resultado.arquivos.forEach(arq => gerados.push({ ...arq, origem }));
       limiteKb = resultado.limite_kb ?? limiteKb;
       (resultado.avisos || []).forEach(a => avisos.push(`${file.name}: ${a}`));
-      if (resultado.citacoes_por_recuo) {
-        citacoes += resultado.citacoes_por_recuo;
+      if (resultado.citacoes_por_recuo || resultado.citacoes_entre_aspas) {
+        citacoes += resultado.citacoes_por_recuo || 0;
+        citacoesEntreAspas += resultado.citacoes_entre_aspas || 0;
         documentosComCitacao += 1;
         (resultado.citacoes_trechos || []).forEach(t => trechos.push(`${file.name}: ${t}`));
       }
@@ -788,6 +790,7 @@ async function processFiles(files) {
       arquivos: gerados,
       avisos: avisos.concat(falhas),
       citacoes_por_recuo: citacoes,
+      citacoes_entre_aspas: citacoesEntreAspas,
       citacoes_trechos: trechos,
       documentos_com_citacao: documentosComCitacao,
       cabecalho_paragrafos: cabecalhos,
@@ -1209,10 +1212,11 @@ async function processFile(file, selecao, opcoes) {
 // resultado para longe, e o começo já basta para reconhecer o tipo de parágrafo
 const MAXIMO_TRECHOS = 5;
 
-// Quadro da citação pelo recuo: diz quantos parágrafos têm forma de citação, mostra o
-// começo deles e oferece a troca (ou o desfazer), já que a conversão não aplica a
-// regra sozinha
-function renderCitacao(total, documentos, trechos) {
+// Quadro da citação pela forma: diz quantos parágrafos têm forma de citação (recuados
+// em fonte menor, ou inteiros entre aspas), mostra o começo deles e oferece a troca (ou
+// o desfazer), já que a conversão não aplica as regras sozinha
+function renderCitacao(recuo, aspas, documentos, trechos) {
+  const total = recuo + aspas;
   if (total === 0) {
     resCitacaoCard.classList.add('hidden');
     resCitacaoResumo.classList.add('hidden');
@@ -1220,16 +1224,34 @@ function renderCitacao(total, documentos, trechos) {
   }
   const um = total === 1;
   const onde = emLote && documentos > 1 ? ` em ${documentos} documentos` : '';
+  const partes = `${recuo} ${recuo === 1 ? 'recuado' : 'recuados'} e em fonte menor que a do texto e ` +
+    `${aspas} ${aspas === 1 ? 'inteiro' : 'inteiros'} entre aspas`;
   if (citacaoPorRecuo) {
-    resCitacaoTexto.textContent = um
-      ? `1 parágrafo recuado e em fonte menor que a do texto${onde} foi convertido como Citação.`
-      : `${total} parágrafos recuados e em fonte menor que a do texto${onde} foram convertidos como Citação.`;
+    if (recuo && aspas) {
+      resCitacaoTexto.textContent = `${total} parágrafos${onde} foram convertidos como Citação: ${partes}.`;
+    } else {
+      const forma = recuo
+        ? (um ? 'recuado e em fonte menor que a do texto' : 'recuados e em fonte menor que a do texto')
+        : (um ? 'inteiro entre aspas' : 'inteiros entre aspas');
+      resCitacaoTexto.textContent = um
+        ? `1 parágrafo ${forma}${onde} foi convertido como Citação.`
+        : `${total} parágrafos ${forma}${onde} foram convertidos como Citação.`;
+    }
     btnCitacao.textContent = 'Manter citações como texto';
     resCitacaoResumo.textContent = `Citações: ${total} convertidas`;
   } else {
-    resCitacaoTexto.textContent = um
-      ? `1 parágrafo${onde} está recuado e em fonte menor que a do texto, como uma citação. Ele saiu como texto comum.`
-      : `${total} parágrafos${onde} estão recuados e em fonte menor que a do texto, como citações. Eles saíram como texto comum.`;
+    if (recuo && aspas) {
+      resCitacaoTexto.textContent =
+        `${total} parágrafos${onde} parecem citações: ${partes}. Eles saíram como texto comum.`;
+    } else if (recuo) {
+      resCitacaoTexto.textContent = um
+        ? `1 parágrafo${onde} está recuado e em fonte menor que a do texto, como uma citação. Ele saiu como texto comum.`
+        : `${total} parágrafos${onde} estão recuados e em fonte menor que a do texto, como citações. Eles saíram como texto comum.`;
+    } else {
+      resCitacaoTexto.textContent = um
+        ? `1 parágrafo${onde} está inteiro entre aspas e passa de uma linha, como uma citação. Ele saiu como texto comum.`
+        : `${total} parágrafos${onde} estão inteiros entre aspas e passam de uma linha, como citações. Eles saíram como texto comum.`;
+    }
     btnCitacao.textContent = 'Converter como citação';
     resCitacaoResumo.textContent = `Citações: ${total} possíveis`;
   }
@@ -1362,7 +1384,12 @@ function renderResults(result, segundos) {
   }
 
   renderCabecalho(result.cabecalho_paragrafos || 0, result.documentos_com_cabecalho || 0, result.cabecalho_trechos || []);
-  renderCitacao(result.citacoes_por_recuo || 0, result.documentos_com_citacao || 0, result.citacoes_trechos || []);
+  renderCitacao(
+    result.citacoes_por_recuo || 0,
+    result.citacoes_entre_aspas || 0,
+    result.documentos_com_citacao || 0,
+    result.citacoes_trechos || []
+  );
   resAjustes.classList.toggle('hidden', resCabecalhoCard.classList.contains('hidden') && resCitacaoCard.classList.contains('hidden'));
   ajustarGuia(result.arquivos);
 

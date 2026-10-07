@@ -622,3 +622,38 @@ def test_erro_no_worker_do_pdfjs_aparece_na_tela(contexto: object, endereco: str
     # Bem antes do prazo do OCR: o erro vem assim que o PDF.js pede algo ao worker
     pagina.locator("#pyodide-status-card", has_text=mensagem).wait_for(timeout=PRAZO_CONVERSAO_MS)
     assert "Não foi possível reconhecer o texto" in pagina.locator("#pyodide-status-card").inner_text()
+
+
+ENTRE_ASPAS = (
+    "“O titular do serviço divulgará, em formato aberto, os dados de oferta e de demanda "
+    "do transporte coletivo, atualizados a cada mês.”"
+)
+
+
+def test_citacao_entre_aspas_e_sugerida_e_convertida_pelo_botao(contexto: object, endereco: str) -> None:
+    pagina = contexto.new_page()  # type: ignore[attr-defined]
+    erros: list[str] = []
+    pagina.on("pageerror", lambda erro: erros.append(str(erro)))
+    pagina.goto(endereco)
+    _esperar_conversor(pagina)
+
+    pagina.set_input_files(
+        "#file-input",
+        files=[{"name": "parecer.md", "mimeType": "text/markdown",
+                "buffer": f"Texto do parecer.\n\n{ENTRE_ASPAS}\n".encode()}],
+    )
+    _resultado_com(pagina, ENTRE_ASPAS)
+    assert 'class="Citação"' not in pagina.evaluate("() => currentResultFiles[0].conteudo")
+    texto = pagina.locator("#res-citacao-texto").text_content()
+    assert texto == (
+        "1 parágrafo está inteiro entre aspas e passa de uma linha, como uma citação. Ele saiu como texto comum."
+    )
+
+    pagina.locator("#res-ajustes summary").click()
+    pagina.click("#btn-citacao")
+    _resultado_com(pagina, f'class="Citação">{ENTRE_ASPAS}')
+    assert pagina.locator("#res-citacao-texto").text_content() == (
+        "1 parágrafo inteiro entre aspas foi convertido como Citação."
+    )
+    assert pagina.locator("#btn-citacao").text_content() == "Manter citações como texto"
+    assert not erros, erros

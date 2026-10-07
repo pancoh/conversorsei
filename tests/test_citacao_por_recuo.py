@@ -266,3 +266,173 @@ def test_cli_e_web_geram_o_mesmo_html_com_a_opcao(tmp_path):
     main([str(entrada), "-o", str(tmp_path), "--citacao-por-recuo"])
     web = converter_documento_memoria("nt.docx", entrada.read_bytes(), citacao_por_recuo=True)
     assert web["arquivos"][0]["conteudo"] == (tmp_path / "nt_SEI.html").read_text(encoding="utf-8")
+
+
+# Citação entre aspas: o parágrafo inteiro entre aspas que passa de uma linha segue o mesmo
+# pedido da citação pelo recuo, e vale em todos os formatos
+ENTRE_ASPAS = (
+    "“O titular do serviço divulgará, em formato aberto, os dados de oferta e de demanda "
+    "do transporte coletivo, atualizados a cada mês.”"
+)
+CURTA = "“O titular divulgará os dados.”"
+
+
+def converter_aspas(nome: str, conteudo: bytes, aplicar: bool = False, **opcoes) -> tuple[dict[str, str], dict]:
+    res = converter_documento_memoria(nome, conteudo, so_corpo=True, citacao_por_recuo=aplicar, **opcoes)
+    assert res["sucesso"], res["erros"]
+    corpo = "\n".join(a["conteudo"] for a in res["arquivos"])
+    return classes_por_texto(corpo), res
+
+
+def docx_com_paragrafos(*textos: str, alinhamento=None) -> bytes:
+    doc = docx.Document()
+    _corpo_comum(doc)
+    for texto in textos:
+        _paragrafo(doc, texto, alinhamento=alinhamento)
+    return _salvar(doc)
+
+
+@pytest.mark.parametrize("aplicar, esperada", [(False, "Texto_Justificado"), (True, "Citação")])
+def test_paragrafo_entre_aspas_com_mais_de_uma_linha_e_sugerido(aplicar, esperada):
+    classes, res = converter_aspas("nt.docx", docx_com_paragrafos(ENTRE_ASPAS), aplicar)
+    assert res["citacoes_entre_aspas"] == 1
+    assert res["citacoes_por_recuo"] == 0
+    assert res["citacoes_trechos"] == [" ".join(ENTRE_ASPAS.split()[:12]) + "…"]
+    # As aspas ficam no texto: a regra só troca a classe
+    assert classes[ENTRE_ASPAS] == esperada
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        ENTRE_ASPAS.removesuffix("”") + ".” (BRASIL, 2020, p. 3).",
+        '"' + ENTRE_ASPAS[1:-1] + '"',
+        "«" + ENTRE_ASPAS[1:-1] + "»",
+        # Quebra de linha dentro das aspas já é mais de uma linha
+        "“Art. 13. O titular divulgará os dados.\nParágrafo único. A divulgação será mensal.”",
+    ],
+)
+def test_variantes_da_citacao_entre_aspas(texto):
+    doc = docx.Document()
+    _corpo_comum(doc)
+    p = _paragrafo(doc, "")
+    for i, linha in enumerate(texto.split("\n")):
+        if i:
+            p.runs[-1].add_break()
+        p.add_run(linha)
+    _, res = converter_aspas("t.docx", _salvar(doc), aplicar=True)
+    assert res["citacoes_entre_aspas"] == 1
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [
+        # Cabe numa linha: fala curta, e não citação em parágrafo próprio
+        CURTA,
+        # Aspas fechadas no meio: dois trechos citados dentro do texto
+        "“Dados abertos” e “transparência ativa” são os dois conceitos que a lei usa ao tratar da divulgação.",
+        # Texto depois das aspas que não é referência
+        ENTRE_ASPAS + " Assim, a obrigação já existe e só falta regulamentar o prazo.",
+        # Aspas que não abrem o parágrafo
+        "Diz a lei: " + ENTRE_ASPAS,
+    ],
+)
+def test_entre_aspas_mas_nao_e_citacao(texto):
+    classes, res = converter_aspas("t.docx", docx_com_paragrafos(texto), aplicar=True)
+    assert res["citacoes_entre_aspas"] == 0
+    assert classes[texto] == "Texto_Justificado"
+
+
+def test_entre_aspas_centralizado_ou_item_numerado_segue_a_regra_de_antes():
+    classes, res = converter_aspas(
+        "t.docx", docx_com_paragrafos(ENTRE_ASPAS, alinhamento=WD_ALIGN_PARAGRAPH.CENTER), aplicar=True
+    )
+    assert res["citacoes_entre_aspas"] == 0
+    assert classes[ENTRE_ASPAS] == "Texto_Centralizado"
+
+    classes, res = converter_aspas("t.docx", docx_com_paragrafos("3.1. " + ENTRE_ASPAS), aplicar=True)
+    assert res["citacoes_entre_aspas"] == 0
+    assert classes[ENTRE_ASPAS] == "Item_Nivel2"
+
+
+def test_recuo_e_aspas_contam_separados_e_os_trechos_seguem_o_documento():
+    doc = docx.Document()
+    _corpo_comum(doc)
+    _corpo_comum(doc)
+    _paragrafo(doc, ENTRE_ASPAS)
+    _paragrafo(doc, CITACAO, tamanho=10, recuo_cm=4)
+    # Recuado, em fonte menor e entre aspas: conta uma vez só, pelo recuo
+    _paragrafo(doc, ENTRE_ASPAS.replace("O titular", "A concessionária"), tamanho=10, recuo_cm=4)
+    _, res = converter_aspas("nt.docx", _salvar(doc))
+    assert (res["citacoes_por_recuo"], res["citacoes_entre_aspas"]) == (2, 1)
+    assert [t.split()[0] for t in res["citacoes_trechos"]] == ["“O", "Art.", "“A"]
+
+
+@pytest.mark.parametrize(
+    "nome, conteudo, opcoes",
+    [
+        ("t.md", f"Texto do parecer.\n\n{ENTRE_ASPAS}\n", {}),
+        ("t.txt", f"Texto do parecer.\n\n{ENTRE_ASPAS}\n", {}),
+        ("t.html", f"<p>Texto do parecer.</p><p>{ENTRE_ASPAS}</p>", {}),
+        ("t.pdf", b"", {"texto_reconhecido": f"Texto do parecer.\n\n{ENTRE_ASPAS}\n"}),
+    ],
+)
+def test_aspas_valem_nos_formatos_sem_recuo(nome, conteudo, opcoes):
+    dados = conteudo.encode() if isinstance(conteudo, str) else conteudo
+    classes, res = converter_aspas(nome, dados, aplicar=True, **opcoes)
+    assert res["citacoes_entre_aspas"] == 1
+    assert classes[ENTRE_ASPAS] == "Citação"
+
+
+def test_citacao_do_markdown_continua_explicita_e_nao_e_sugerida():
+    classes, res = converter_aspas("t.md", f"Texto.\n\n> {ENTRE_ASPAS}\n".encode())
+    assert res["citacoes_entre_aspas"] == 0
+    assert classes[ENTRE_ASPAS] == "Citação"
+
+
+def odt_com_paragrafos(*corpos: str) -> bytes:
+    paragrafos = "".join(f'<text:p text:style-name="{estilo}">{texto}</text:p>' for estilo, texto in corpos)
+    content = CONTENT_ODT.split("<office:text>")[0] + f"<office:text>{paragrafos}</office:text>" + (
+        CONTENT_ODT.split("</office:text>")[1]
+    )
+    content = content.replace(
+        "</office:automatic-styles>",
+        '<style:style style:name="T1" style:family="text"><style:text-properties fo:font-style="italic"/>'
+        "</style:style></office:automatic-styles>",
+    )
+    saida = io.BytesIO()
+    with zipfile.ZipFile(saida, "w") as z:
+        z.writestr("mimetype", "application/vnd.oasis.opendocument.text")
+        z.writestr("content.xml", content)
+        z.writestr("styles.xml", STYLES_ODT)
+    return saida.getvalue()
+
+
+def test_odt_em_italico_e_recuado_entre_aspas_contam_uma_vez():
+    """O asterisco do itálico não esconde as aspas, e o ODT não conta o parágrafo duas vezes."""
+    recuada = ENTRE_ASPAS.replace("O titular", "A concessionária")
+    conteudo = odt_com_paragrafos(
+        ("P1", "Trata-se de análise da proposição, com os fundamentos a seguir."),
+        ("P1", "A lei dispõe sobre a transparência dos dados do transporte coletivo."),
+        ("P1", f'<text:span text:style-name="T1">{ENTRE_ASPAS}</text:span>'),
+        ("P2", recuada),
+    )
+    classes, res = converter_aspas("nt.odt", conteudo)
+    assert (res["citacoes_por_recuo"], res["citacoes_entre_aspas"]) == (1, 1)
+    assert len(res["citacoes_trechos"]) == 2
+    assert not any("*" in t for t in res["citacoes_trechos"])
+
+    classes, res = converter_aspas("nt.odt", conteudo, aplicar=True)
+    assert classes[ENTRE_ASPAS] == "Citação"
+    assert classes[recuada] == "Citação"
+
+
+def test_cli_explica_a_citacao_entre_aspas(tmp_path, capsys):
+    entrada = tmp_path / "nt.md"
+    entrada.write_text(f"Texto do parecer.\n\n{ENTRE_ASPAS}\n", encoding="utf-8")
+
+    assert main([str(entrada), "-o", str(tmp_path / "a")]) == 0
+    assert "1 parágrafo entre aspas e com mais de uma linha parece citação" in capsys.readouterr().out
+
+    assert main([str(entrada), "-o", str(tmp_path / "b"), "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["citacoes_entre_aspas"] == 1

@@ -88,17 +88,22 @@ def aviso_de_citacao(res: ResultadoConversao, aplicada: bool) -> str | None:
     Desligada a opção, diz como ligá-la: a regra adivinha pela medida e erra em alguns
     documentos, então quem converte decide, como faz o botão da interface web.
     """
-    n = res.citacoes_por_recuo
+    recuo, aspas = res.citacoes_por_recuo, res.citacoes_entre_aspas
+    n = recuo + aspas
     if not n:
         return None
-    if n == 1:
-        sujeito = "1 parágrafo recuado e em fonte menor que a do texto"
-        if aplicada:
-            return f"{sujeito} foi convertido como Citação."
-        return f"{sujeito} parece citação e saiu como texto comum. Para convertê-lo, use --citacao-por-recuo."
-    sujeito = f"{n} parágrafos recuados e em fonte menor que a do texto"
+    um = n == 1
+    paragrafos = "1 parágrafo" if um else f"{n} parágrafos"
+    if not aspas:
+        sujeito = f"{paragrafos} {'recuado' if um else 'recuados'} e em fonte menor que a do texto"
+    elif not recuo:
+        sujeito = f"{paragrafos} entre aspas e com mais de uma linha"
+    else:
+        sujeito = f"{paragrafos} ({recuo} recuados e em fonte menor, {aspas} entre aspas)"
     if aplicada:
-        return f"{sujeito} foram convertidos como Citação."
+        return f"{sujeito} {'foi convertido' if um else 'foram convertidos'} como Citação."
+    if um:
+        return f"{sujeito} parece citação e saiu como texto comum. Para convertê-lo, use --citacao-por-recuo."
     return f"{sujeito} parecem citação e saíram como texto comum. Para convertê-los, use --citacao-por-recuo."
 
 
@@ -236,7 +241,10 @@ Exemplos de uso:
     parser.add_argument(
         "--citacao-por-recuo",
         action="store_true",
-        help="Converte como Citação o parágrafo recuado (2 cm ou mais) e em fonte menor que a do texto (.docx e .odt).",
+        help=(
+            "Converte como Citação o parágrafo recuado (2 cm ou mais) e em fonte menor que a do texto (.docx e "
+            ".odt) e o parágrafo inteiro entre aspas com mais de uma linha (todos os formatos)."
+        ),
     )
     parser.add_argument(
         "--sem-cabecalho",
@@ -369,6 +377,7 @@ def main(argv: list[str] | None = None) -> int:
                 "erros": r.erros,
                 "avisos": r.avisos,
                 "citacoes_por_recuo": r.citacoes_por_recuo,
+                "citacoes_entre_aspas": r.citacoes_entre_aspas,
                 "cabecalho_paragrafos": len(r.cabecalho_trechos),
             }
             for r in resultados
