@@ -197,8 +197,17 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     # Primeira visita: carrega o Pyodide do CDN e converte
     pagina.goto(endereco)
     _esperar_conversor(pagina)
+
+    # A explicação de privacidade começa fechada e abre pelo resumo, sem abrir a escolha
+    # de arquivos (o quadro fica fora do label da área de envio)
+    privacidade = pagina.locator("#drop-ajuda")
+    assert not privacidade.evaluate("el => el.open")
+    privacidade.locator("summary").click()
+    assert "desligue a internet" in privacidade.inner_text()
+
     _enviar(pagina)
     pagina.locator("button.btn-copy").wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
+    assert not privacidade.is_visible()
     assert pagina.locator("#results-section").evaluate(
         "el => el.previousElementSibling.id === 'pyodide-status-card'"
     )

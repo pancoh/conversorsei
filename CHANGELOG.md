@@ -10,6 +10,10 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 - **Assinatura colada de um chat.** A assinatura escrita num parágrafo só, com a marca, o
   nome e o cargo em linhas quebradas, passa a sair como bloco de assinatura, uma linha por
   parágrafo.
+- **Privacidade explicada na página.** Abaixo da área de envio, o quadro "Seus documentos
+  não saem do seu computador" explica que o documento não é enviado a servidores nem a
+  serviços de inteligência artificial, que nada fica guardado e como conferir isso
+  desligando a internet.
 
 ## 0.5.0 (2026-10-07)
 
