@@ -58,9 +58,9 @@ li {{font-size:12pt; font-family:Calibri; text-align:justify; margin:3pt 0;}}
 <body>
 <!-- ============================================================
      COMO USAR (este comentário NÃO é copiado):
-     1. Abra este arquivo no Chrome / navegador
-     2. Cmd+A (selecionar tudo) e Cmd+C (copiar)
-     3. No editor do documento SEI, clique no corpo e Cmd+V
+     1. Abra este arquivo no navegador
+     2. Ctrl+A (selecionar tudo) e Ctrl+C (copiar); no Mac, Cmd+A e Cmd+C
+     3. No editor do documento SEI, clique no corpo e Ctrl+V (Cmd+V no Mac)
      4. Confira a numeração automática e as tabelas; depois Salvar
      ============================================================ -->
 {corpo_html}

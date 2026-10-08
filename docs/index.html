@@ -186,7 +186,7 @@
           <p><strong class="font-semibold text-slate-700">Sem armazenamento.</strong> Não há conta nem histórico. O documento não fica guardado: ao fechar a aba, ele some da página. Ninguém tem acesso ao que você converte, nem quem mantém o site.</p>
           <p><strong class="font-semibold text-slate-700">Regras fixas.</strong> O conversor não usa inteligência artificial: aplica regras de formatação, e o mesmo documento dá sempre o mesmo resultado. O reconhecimento de texto de PDF digitalizado (OCR) também roda no navegador.</p>
           <p><strong class="font-semibold text-slate-700">Como conferir.</strong> Depois de abrir a página, desligue a internet e converta um documento. A conversão continua funcionando. O código é aberto e pode ser conferido no <a href="https://github.com/pancoh/conversorsei" target="_blank" rel="noopener" class="text-blue-700 underline underline-offset-2">GitHub</a>.</p>
-          <p><strong class="font-semibold text-slate-700">O que a página registra.</strong> Apenas a quantidade de conversões e o formato dos arquivos, sem o nome nem o conteúdo.</p>
+          <p><strong class="font-semibold text-slate-700">O que a página registra.</strong> A contagem de acessos e de conversões, com o formato dos arquivos e o resultado, pelo GoatCounter, sem cookies. O contador também recebe dados gerais do acesso, como navegador, tamanho da tela e país. O nome e o conteúdo dos documentos nunca são registrados.</p>
           <p class="text-slate-500">Um cuidado que vale para qualquer documento: o texto copiado para o SEI fica na área de transferência até você copiar outra coisa. Em computador compartilhado, lembre-se disso.</p>
         </div>
       </details>
@@ -348,12 +348,16 @@
       <div id="novidades-lista" class="p-5 overflow-y-auto space-y-5 text-sm text-slate-600">
         <!-- novidades:inicio -->
         <section class="space-y-2">
+          <h4 class="font-semibold text-slate-800">Em desenvolvimento <span class="font-normal text-slate-500">já na página</span></h4>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Travessões preservados.</strong> O travessão e a meia-risca ficam no texto em todos os formatos, como já ficavam no Word. Antes, nos outros formatos, o travessão virava vírgula e a meia-risca sumia: "2020–2023" saía "20202023".</li><li><strong>Títulos do LibreOffice como os do Word.</strong> O título sem número de um .odt passa a sair como item numerado do SEI, no nível do título, como o Título 1 do Word.</li><li><strong>Listas do LibreOffice.</strong> A lista numerada de um .odt sai com o número escrito no texto ("1.", "a)"), como a lista numerada colada, e a lista com marcadores mantém os subníveis.</li><li><strong>Notas de rodapé do Word.</strong> As notas passam para o fim do texto, numa seção Notas, com a chamada entre colchetes ([1], [2]), como já acontecia no .odt. Antes, elas se perdiam.</li><li><strong>Parágrafo sem numeração no Word.</strong> O parágrafo em que a numeração foi desligada deixa de sair como item numerado.</li><li><strong>Links.</strong> O link sai sem cor e sublinhado embutidos, como o do Word, e o endereço com parênteses fica inteiro. Link que executaria código (javascript:) sai como texto.</li><li><strong>Linha de comando.</strong> <code>--max-nivel</code> aceita só de 1 a 4, os níveis do SEI. <code>--saida</code> com mais de um arquivo passa a dar erro, em vez de ser ignorada. O <code>--json</code> traz os trechos de citação e de cabeçalho.</li><li><strong>Privacidade.</strong> A página, o rodapé e o README descrevem do mesmo jeito o que a contagem de acessos registra.</li></ul>
+        </section>
+        <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Versão 0.6.1 <span class="font-normal text-slate-500">8 de outubro de 2026</span></h4>
           <ul class="list-disc pl-5 space-y-1.5"><li><strong>Imagens do Word no tamanho da página.</strong> A imagem passa a sair com a largura que tem no Word, proporcional à página: a foto na largura toda fica com cerca de 800 px no SEI, e a altura acompanha. Antes, a foto aparecia no tamanho original, muito maior que a página, e precisava ser reduzida à mão. A imagem nunca é ampliada além do tamanho original.</li><li><strong>Colunas de tabela pelo conteúdo.</strong> Quando todas as colunas têm a mesma largura (o padrão do Word e de toda tabela vinda de Markdown, ODT, HTML ou PDF), a largura de cada uma passa a ser calculada pelo texto: uma coluna só com os números 1, 2, 3 fica estreita, e as de texto longo ficam largas. Larguras ajustadas no Word continuam como estão.</li><li><strong>Assinatura no meio do documento.</strong> A assinatura que vem antes de um despacho, como a do coordenador antes do "De acordo." da diretora, passa a sair como bloco de assinatura, e não só a que fecha o documento. O bloco do meio começa na marca "[assinado eletronicamente]".</li></ul>
         </section>
         <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Versão 0.6.0 <span class="font-normal text-slate-500">8 de outubro de 2026</span></h4>
-          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Documento inteiro num arquivo só.</strong> O documento longo deixa de ser dividido em partes: a cópia e a colagem direto no editor do SEI levam o documento inteiro com a formatação. A divisão servia ao limite do plugin SEI Pro. Saem também o painel "Opções de conversão", o tamanho do arquivo e o aviso de limite. Na linha de comando, saem `--unico`, `--partes` e `--max-kb`, e as partes de conversões anteriores são apagadas da pasta de saída.</li><li><strong>Rodapé.</strong> A versão passa a ocupar uma linha própria, e o rodapé deixa de quebrar o texto e os botões em telas médias.</li><li><strong>Assinatura colada de um chat.</strong> A assinatura escrita num parágrafo só, com a marca, o nome e o cargo em linhas quebradas, passa a sair como bloco de assinatura, uma linha por parágrafo.</li><li><strong>Privacidade explicada na página.</strong> Abaixo da área de envio, o quadro "Seus documentos não saem do seu computador" explica que o documento não é enviado a servidores nem a serviços de inteligência artificial, que nada fica guardado e como conferir isso desligando a internet.</li></ul>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Documento inteiro num arquivo só.</strong> O documento longo deixa de ser dividido em partes: a cópia e a colagem direto no editor do SEI levam o documento inteiro com a formatação. A divisão servia ao limite do plugin SEI Pro. Saem também o painel "Opções de conversão", o tamanho do arquivo e o aviso de limite. Na linha de comando, saem <code>--unico</code>, <code>--partes</code> e <code>--max-kb</code>, e as partes de conversões anteriores são apagadas da pasta de saída.</li><li><strong>Rodapé.</strong> A versão passa a ocupar uma linha própria, e o rodapé deixa de quebrar o texto e os botões em telas médias.</li><li><strong>Assinatura colada de um chat.</strong> A assinatura escrita num parágrafo só, com a marca, o nome e o cargo em linhas quebradas, passa a sair como bloco de assinatura, uma linha por parágrafo.</li><li><strong>Privacidade explicada na página.</strong> Abaixo da área de envio, o quadro "Seus documentos não saem do seu computador" explica que o documento não é enviado a servidores nem a serviços de inteligência artificial, que nada fica guardado e como conferir isso desligando a internet.</li></ul>
         </section>
         <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Versão 0.5.0 <span class="font-normal text-slate-500">7 de outubro de 2026</span></h4>
@@ -455,14 +459,14 @@
         </p>
         <p class="flex items-start justify-center lg:justify-start gap-1.5 text-center lg:text-left">
           <i data-lucide="shield-check" class="w-3.5 h-3.5 mt-px flex-shrink-0 text-slate-400"></i>
-          <span>A página registra estatísticas anônimas de uso, sem cookies: número de acessos e formato dos arquivos convertidos.</span>
+          <span>A página registra estatísticas anônimas de uso, sem cookies: acessos e conversões, com o formato dos arquivos e o resultado. O nome e o conteúdo dos documentos nunca são registrados.</span>
         </p>
       </div>
     </div>
   </footer>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=bc18539099"></script>
+  <script src="app.js?v=a06b40c401"></script>
 
   <!-- Contagem de acessos, sem cookies. Fica fora do service worker: sem rede, a visita
        apenas não é contada, e a página continua abrindo -->

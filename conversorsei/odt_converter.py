@@ -10,17 +10,20 @@ from __future__ import annotations
 import re
 import zipfile
 import zlib
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from xml.etree import ElementTree
 
+from conversorsei.docx_converter import AVISO_NOTAS
 from conversorsei.entrada import FonteDocumento, abrir_binario, nome_da_fonte
 from conversorsei.formatacao import (
+    ESTILO_NUMERO_LITERAL,
     CitacaoPorRecuo,
     Formatacao,
     classe_sei_pelo_nome,
     fonte_predominante,
     indices_de_assinatura,
     linha_curta,
+    numero_da_lista,
     paragrafos_entre_aspas,
     pode_ser_linha_de_assinatura,
 )
@@ -470,6 +473,53 @@ def citacao_entre_aspas(
     return {elementos[i] for i in paragrafos_entre_aspas(textos)}
 
 
+@dataclass
+class NumeracaoDaLista:
+    """Como um nível de lista numerada escreve o número: formato, pontuação e início."""
+
+    tipo: str = "1"
+    prefixo: str = ""
+    sufixo: str = "."
+    inicio: int = 1
+
+    def numero(self, posicao: int) -> str:
+        return f"{self.prefixo}{numero_da_lista(posicao, self.tipo)}{self.sufixo}"
+
+
+def mapear_listas(*raizes: ElementTree.Element | None) -> dict[str, dict[int, NumeracaoDaLista]]:
+    """Mapeia cada estilo de lista para a numeração dos níveis que têm número.
+
+    Nível com marcador, ou com o formato vazio (o LibreOffice não mostra número), fica de
+    fora: o item segue como marcador.
+    """
+    listas: dict[str, dict[int, NumeracaoDaLista]] = {}
+    for raiz in raizes:
+        if raiz is None:
+            continue
+        for estilo in raiz.iter(_q("text", "list-style")):
+            nome = estilo.get(_q("style", "name"))
+            if not nome or nome in listas:
+                continue
+            niveis: dict[int, NumeracaoDaLista] = {}
+            for nivel in estilo.findall(_q("text", "list-level-style-number")):
+                tipo = nivel.get(_q("style", "num-format")) or ""
+                if not tipo:
+                    continue
+                try:
+                    numero_do_nivel = int(nivel.get(_q("text", "level")) or 1)
+                    inicio = int(nivel.get(_q("text", "start-value")) or 1)
+                except ValueError:
+                    continue
+                niveis[numero_do_nivel] = NumeracaoDaLista(
+                    tipo=tipo if tipo in ("1", "a", "A", "i", "I") else "1",
+                    prefixo=nivel.get(_q("style", "num-prefix")) or "",
+                    sufixo=nivel.get(_q("style", "num-suffix")) or "",
+                    inicio=inicio,
+                )
+            listas[nome] = niveis
+    return listas
+
+
 def converter_corpo(
     corpo: ElementTree.Element,
     estilos: dict[str, FormatoTrecho],
@@ -478,6 +528,7 @@ def converter_corpo(
     heranca_completa: dict[str, str] | None = None,
     citacao: CitacaoPorRecuo | None = None,
     notas: list[tuple[str, str]] | None = None,
+    listas: dict[str, dict[int, NumeracaoDaLista]] | None = None,
 ) -> list[str]:
     """Percorre o corpo do documento devolvendo linhas de Markdown.
 
@@ -485,6 +536,7 @@ def converter_corpo(
     sempre serviu. `heranca_completa` inclui os estilos nomeados de styles.xml, para a
     classe explícita ser achada também quando vem de um estilo nomeado derivado.
     `citacao` conta os parágrafos com forma de citação e os converte quando pedido.
+    `listas` traz, por estilo de lista, a numeração de cada nível (mapear_listas).
 
     As linhas centralizadas que fecham o documento viram o bloco de assinatura, pela
     mesma política do Word (formatacao.linhas_de_assinatura).
@@ -502,52 +554,105 @@ def converter_corpo(
     ) -> None:
         registros.append((len(linhas) - 1, candidata, formato or Formatacao(), texto, curta))
 
-    def visitar(no: ElementTree.Element, dentro_de_lista: bool = False) -> None:
-        for filho in no:
-            tag = filho.tag
+    def paragrafo(filho: ElementTree.Element) -> tuple[str, Formatacao] | None:
+        """Texto em Markdown e formatação de um text:p ou text:h, ou None se vazio."""
+        texto = texto_do_no(filho, estilos, notas).strip()
+        if not texto:
+            return None
+        formato = formatacao_do_paragrafo(filho, formatos, estilos)
+        if formato.riscado:
+            # Vale para item de lista e título também, que não passam por classe
+            texto = riscar_inteiro(texto)
+        return texto, formato
 
-            if tag in (_q("text", "h"), _q("text", "p")):
-                texto = texto_do_no(filho, estilos, notas).strip()
-                if not texto:
+    def lista(no: ElementTree.Element, nivel: int, estilo_pai: str | None) -> None:
+        """Itens de uma text:list, pelo estilo de lista do nível.
+
+        O nível com número ("1.", "a)") sai com o número escrito no texto, como a lista
+        numerada do HTML: o número é do texto, e não da numeração do SEI. O nível com
+        marcador sai como item de lista, com dois espaços por nível, e os itens ficam
+        colados: uma linha em branco entre eles quebraria a lista em várias.
+        """
+        estilo = no.get(_q("text", "style-name")) or estilo_pai
+        numeracao = (listas or {}).get(estilo or "", {}).get(nivel + 1)
+        posicao = numeracao.inicio if numeracao else 1
+        for item in no:
+            if item.tag not in (_q("text", "list-item"), _q("text", "list-header")):
+                continue
+            numerado = numeracao is not None and item.tag == _q("text", "list-item")
+            try:
+                posicao = int(item.get(_q("text", "start-value")) or posicao)
+            except ValueError:
+                pass
+            primeiro = True
+            for filho in item:
+                if filho.tag == _q("text", "list"):
+                    lista(filho, nivel + 1, estilo)
                     continue
-                formato = formatacao_do_paragrafo(filho, formatos, estilos)
-                if formato.riscado:
-                    # Vale para item de lista e título também, que não passam por classe
-                    texto = riscar_inteiro(texto)
-                if dentro_de_lista:
-                    # Os itens saem colados: uma linha em branco entre eles quebraria a
-                    # lista em várias no Markdown
-                    linhas.append(f"- {texto}")
-                    registrar()
+                if filho.tag not in (_q("text", "h"), _q("text", "p")):
+                    elemento(filho)
                     continue
-                if tag == _q("text", "h"):
-                    nivel = _nivel_do_titulo(filho)
-                else:
-                    nivel = nivel_do_estilo(filho.get(_q("text", "style-name")), heranca)
-                if nivel:
-                    linhas.append(f"{'#' * nivel} {texto}")
-                    registrar()
-                else:
-                    explicita = classe_explicita(filho.get(_q("text", "style-name")), heranca_completa)
-                    linhas.append(linha_com_classe(texto, formato, explicita, citacao, filho in aspas))
-                    visivel = desescapar_markdown(texto)
-                    sem_classe = not explicita and not comeca_com_item(texto)
-                    candidata = sem_classe and pode_ser_linha_de_assinatura(visivel, formato.alinhamento)
-                    registrar(candidata, formato, texto, visivel if sem_classe and linha_curta(visivel) else None)
-                linhas.append("")
-            elif tag == _q("table", "table"):
-                md_tabela = tabela_para_markdown(filho, estilos, notas)
-                if md_tabela:
-                    linhas.extend(md_tabela)
+                lido = paragrafo(filho)
+                if lido is None:
+                    continue
+                texto = lido[0]
+                if numerado and numeracao is not None:
+                    if primeiro:
+                        texto = f"{numeracao.numero(posicao)} {texto}"
+                    linhas.append(linha_com_classe(texto, Formatacao(), ESTILO_NUMERO_LITERAL))
                     registrar()
                     linhas.append("")
-            elif tag == _q("text", "list"):
-                visitar(filho, dentro_de_lista=True)
-                linhas.append("")
-            elif tag == _q("text", "list-item"):
-                visitar(filho, dentro_de_lista=True)
+                else:
+                    linhas.append(f"{'  ' * min(nivel, 3)}- {texto}")
+                    registrar()
+                primeiro = False
+            if numerado:
+                posicao += 1
+        if nivel == 0:
+            linhas.append("")
+
+    def elemento(filho: ElementTree.Element) -> None:
+        tag = filho.tag
+        if tag in (_q("text", "h"), _q("text", "p")):
+            lido = paragrafo(filho)
+            if lido is None:
+                return
+            texto, formato = lido
+            if tag == _q("text", "h"):
+                nivel = _nivel_do_titulo(filho)
             else:
-                visitar(filho, dentro_de_lista=dentro_de_lista)
+                nivel = nivel_do_estilo(filho.get(_q("text", "style-name")), heranca)
+            if nivel and (comeca_com_item(texto) or formato.riscado):
+                # O número digitado decide o nível, como no Word ("1.1. Detalhamento"). O
+                # título riscado sem número é parágrafo revogado, e o Markdown o faz Tachado
+                linhas.append(f"{'#' * nivel} {texto}")
+                registrar()
+            elif nivel:
+                # Título sem número: Item_Nivel do nível do título, como o Título do Word
+                linhas.append(linha_com_classe(texto, formato, f"Item_Nivel{nivel}"))
+                registrar()
+            else:
+                explicita = classe_explicita(filho.get(_q("text", "style-name")), heranca_completa)
+                linhas.append(linha_com_classe(texto, formato, explicita, citacao, filho in aspas))
+                visivel = desescapar_markdown(texto)
+                sem_classe = not explicita and not comeca_com_item(texto)
+                candidata = sem_classe and pode_ser_linha_de_assinatura(visivel, formato.alinhamento)
+                registrar(candidata, formato, texto, visivel if sem_classe and linha_curta(visivel) else None)
+            linhas.append("")
+        elif tag == _q("table", "table"):
+            md_tabela = tabela_para_markdown(filho, estilos, notas)
+            if md_tabela:
+                linhas.extend(md_tabela)
+                registrar()
+                linhas.append("")
+        elif tag == _q("text", "list"):
+            lista(filho, 0, None)
+        else:
+            visitar(filho)
+
+    def visitar(no: ElementTree.Element) -> None:
+        for filho in no:
+            elemento(filho)
 
     visitar(corpo)
     for i in indices_de_assinatura([candidata for _, candidata, *_ in registros], [curta for *_, curta in registros]):
@@ -584,8 +689,13 @@ def extrair_markdown_odt(
     if citacao is not None:
         citacao.fonte_do_corpo = fonte_do_corpo(corpo, formatos)
     notas: list[tuple[str, str]] = []
-    markdown = "\n".join(converter_corpo(corpo, estilos, heranca, formatos, heranca_completa, citacao, notas))
+    listas = mapear_listas(raiz, raiz_estilos)
+    markdown = "\n".join(
+        converter_corpo(corpo, estilos, heranca, formatos, heranca_completa, citacao, notas, listas)
+    )
     if notas:
+        if avisos is not None:
+            avisos.append(AVISO_NOTAS)
         markdown += "\n\n## Notas\n\n" + "\n\n".join(f"Nota {numero}: {texto}" for numero, texto in notas)
     markdown = re.sub(r"\n{3,}", "\n\n", markdown).strip()
     if not markdown:

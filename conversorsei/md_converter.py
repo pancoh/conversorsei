@@ -13,7 +13,7 @@ from pathlib import Path
 
 import docx
 
-# docx.Document e a fabrica; o tipo do objeto vive em docx.document
+# docx.Document é a fábrica; o tipo do objeto vive em docx.document
 from docx.document import Document as DocumentoWord
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -36,7 +36,9 @@ from conversorsei.formatacao import (
 )
 
 RE_INICIO_NUMERADO = re.compile(r"^\d+(?:\.\d+)*\.?\s")
-RE_LINK = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
+# O endereço pode ter um par de parênteses ("..._(direito)"), sem o qual o link terminaria
+# no primeiro ")" e deixaria o resto no texto
+RE_LINK = re.compile(r"\[([^\]]*)\]\(((?:[^()]|\([^()]*\))+)\)")
 RE_IMAGEM_MD = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 MARCA_QUEBRA_ODT = "\ue000"
 # Célula do ODT que ocupa várias colunas: a largura vai no início do texto, entre dois
@@ -128,19 +130,6 @@ def restaurar_escapes(texto: str) -> str:
     return RE_SENTINELA.sub(lambda m: chr(int(m.group(1))), texto)
 
 
-def sanitizar_travessoes(texto: str) -> str:
-    """Remove travessões/meia-riscas (— ou –) substituindo por vírgulas ou ajustando pontuação.
-
-    O hífen comum (-) é rigorosamente preservado.
-    """
-    texto = re.sub(r"\s+[—–]\s+", ", ", texto)
-    texto = texto.replace("—", "").replace("–", "")
-    texto = re.sub(r",\s*,", ",", texto)
-    # O travessão de aposto ("o IPI –, na aquisição") deixa espaço antes da pontuação
-    texto = re.sub(r"\s+([,;.])", r"\1", texto)
-    return texto
-
-
 def definir_fundo_celula(cell, fill_hex: str) -> None:
     tcPr = cell._tc.get_or_add_tcPr()
     shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{fill_hex}"/>')
@@ -176,7 +165,12 @@ def aplicar_bordas_tabela(table) -> None:
 
 
 def adicionar_hiperlink(paragraph, url: str, text: str, riscado: bool = False) -> None:
-    """Adiciona um hyperlink real (azul, sublinhado, Calibri 11) ao parágrafo do docx."""
+    """Adiciona um hyperlink real (Calibri 11) ao parágrafo do docx.
+
+    Sem cor nem sublinhado no run: o docx_converter levaria os dois para o HTML como
+    <span style="color"> e <u>, e o link do Markdown, do ODT e do HTML sairia diferente do
+    link do Word, que tem a aparência pelo estilo. Quem desenha o link é o editor do SEI.
+    """
     part = paragraph.part
     r_id = part.relate_to(url, RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
 
@@ -192,12 +186,6 @@ def adicionar_hiperlink(paragraph, url: str, text: str, riscado: bool = False) -
     sz = OxmlElement("w:sz")
     sz.set(qn("w:val"), "22")
     rPr.append(sz)
-    color = OxmlElement("w:color")
-    color.set(qn("w:val"), "0563C1")
-    rPr.append(color)
-    u = OxmlElement("w:u")
-    u.set(qn("w:val"), "single")
-    rPr.append(u)
     if riscado:
         rPr.append(OxmlElement("w:strike"))
     new_run.append(rPr)
@@ -375,7 +363,9 @@ def format_paragraph(
     elif not is_heading:
         p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-    clean_text = proteger_escapes(sanitizar_travessoes(text))
+    # O texto vai como veio, travessões inclusive, como no .docx: a limpeza antiga trocava
+    # o travessão por vírgula e apagava a meia-risca ("2020–2023" virava "20202023")
+    clean_text = proteger_escapes(text)
 
     for seg in parse_markdown_inline(clean_text):
         if seg[0] == "link":
@@ -622,8 +612,10 @@ def montar_docx_de_markdown(conteudo: str, estendido: bool = True, extraido: boo
     outro sentido: citação (">"), bloco de código ("```") e riscado ("~~").
 
     `extraido` verdadeiro indica Markdown gerado pelos leitores de ODT e PDF. Ali o
-    "#" de nível 1 é seção do documento, e não o título dele: fica centralizado, como
-    sempre ficou, sem a caixa alta de Texto_Centralizado_Maiusculas_Negrito.
+    "#" sem número é seção destacada (a linha em caixa alta do PDF, as "Notas" do ODT), e
+    não o título do documento: fica centralizado, sem a caixa alta de
+    Texto_Centralizado_Maiusculas_Negrito. O título sem número do ODT não passa por aqui:
+    o leitor o escreve como Item_Nivel, como o Título do Word.
     """
     doc = docx.Document()
     section = doc.sections[0]
@@ -717,7 +709,8 @@ def montar_docx_de_markdown(conteudo: str, estendido: bool = True, extraido: boo
             i += 1
             continue
 
-        if line[:2] in ("- ", "* "):
+        # Os três marcadores do CommonMark; o "+" é o que a página reconhece no texto colado
+        if line[:2] in ("- ", "* ", "+ "):
             text = line[2:].strip()
             tarefa = re.match(r"^\[([ xX])\]\s*(.*)$", text)
             if tarefa:

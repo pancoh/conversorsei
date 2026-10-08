@@ -1,5 +1,5 @@
 """
-core.py — Orquestrador principal de conversão para documentos DOCX, PDF, ODT, MD e TXT.
+core.py — Orquestrador principal de conversão para documentos DOCX, PDF, ODT, HTML, MD e TXT.
 """
 from __future__ import annotations
 
@@ -232,7 +232,7 @@ def converter_documento(
     citacao_por_recuo: bool = False,
     omitir_cabecalho: bool = False,
 ) -> ResultadoConversao:
-    """Converte um documento (DOCX, PDF, ODT, MD, TXT) em HTML(s) formatado(s) para o SEI.
+    """Converte um documento (DOCX, PDF, ODT, HTML, MD, TXT) num HTML formatado para o SEI.
 
     Com `citacao_por_recuo`, o parágrafo recuado e em fonte menor que a do texto sai como
     Citação. Desligado, ele segue texto comum e só é contado em `citacoes_por_recuo`.

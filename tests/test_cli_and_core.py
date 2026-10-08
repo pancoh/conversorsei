@@ -58,6 +58,22 @@ def test_cli_conversao_json(tmp_path, capsys):
     assert len(dados) == 1
     assert dados[0]["sucesso"] is True
     assert len(dados[0]["gerados"]) == 1
+    # Os mesmos campos que a interface web recebe
+    assert dados[0]["citacoes_trechos"] == []
+    assert dados[0]["cabecalho_trechos"] == []
+
+
+def test_cli_saida_com_varios_alvos_e_recusada(tmp_path, capsys):
+    """--saida nomeia um arquivo só: com pasta ou vários arquivos, antes era ignorada em silêncio."""
+    um = tmp_path / "um.md"
+    dois = tmp_path / "dois.md"
+    for arquivo in (um, dois):
+        arquivo.write_text("1. ASSUNTO\n\nTexto.", encoding="utf-8")
+
+    assert main([str(um), str(dois), "--saida", str(tmp_path / "fixo.html")]) == 1
+    assert main([str(tmp_path), "--saida", str(tmp_path / "fixo.html")]) == 1
+    assert "--saida" in capsys.readouterr().err
+    assert not (tmp_path / "fixo.html").exists()
 
 
 
@@ -98,6 +114,27 @@ def test_cli_recusa_as_opcoes_de_divisao_retiradas(tmp_path):
     for opcao in (["--unico"], ["--partes"], ["--max-kb", "18"]):
         with pytest.raises(SystemExit):
             main([str(entrada), "-o", str(tmp_path), *opcao])
+
+
+def test_cli_max_nivel_so_aceita_os_niveis_do_sei(tmp_path):
+    """O SEI tem Item_Nivel1 a 4: 0 ou 5 gerariam classe que o editor não conhece."""
+    entrada = tmp_path / "doc.md"
+    entrada.write_text("1. ASSUNTO\n\n1.1.1.1.1. Quinto nível.", encoding="utf-8")
+
+    for valor in ("0", "5", "x"):
+        with pytest.raises(SystemExit):
+            main([str(entrada), "-o", str(tmp_path), "--max-nivel", valor])
+
+
+def test_core_max_nivel_acima_de_4_nao_gera_classe_inexistente(tmp_path):
+    entrada = tmp_path / "doc.md"
+    entrada.write_text("1. ASSUNTO\n\n1.1.1.1.1. Quinto nível.", encoding="utf-8")
+
+    res = converter_documento(entrada, outdir=tmp_path / "saida", max_nivel=5)
+    html = res.arquivos_gerados[0].read_text(encoding="utf-8")
+    assert "Item_Nivel5" not in html
+    assert '<p class="Item_Alinea_Letra">Quinto nível.</p>' in html
+    assert not res.avisos
 
 
 def test_core_converte_readme_quando_solicitado(tmp_path):

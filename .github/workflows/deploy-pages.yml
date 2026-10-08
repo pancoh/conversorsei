@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - master
   pull_request:
   workflow_dispatch:
 
@@ -50,7 +49,7 @@ jobs:
       - name: Pytest
         run: uv run --frozen pytest -q
 
-      - name: Bundle web sincronizado com o codigo-fonte
+      - name: Bundle web sincronizado com o código-fonte
         run: uv run --frozen python scripts/bundle_web.py --verificar
 
       - name: CSS do Tailwind cobre as classes da interface
@@ -100,17 +99,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
+      # Publica docs/ como está no commit: o job verificar já conferiu que o ZIP e as
+      # marcas de versão estão em dia. Gerar de novo aqui publicaria um arquivo diferente
+      # do conferido, se a compressão de outro Python produzisse outros bytes
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-
-      - name: Build Web Bundle
-        run: |
-          python scripts/bundle_web.py
 
       - name: Setup Pages
         uses: actions/configure-pages@v6

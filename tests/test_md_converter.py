@@ -78,16 +78,23 @@ def test_md_escape_de_asterisco_nao_vira_enfase(tmp_path):
     assert "<em>" not in html
 
 
-def test_travessao_de_aposto_nao_deixa_espaco_antes_da_virgula(tmp_path):
-    """"Industrializados – IPI –, na aquisição" vira "Industrializados, IPI, na aquisição"."""
+def test_travessao_e_meia_risca_ficam_no_texto(tmp_path):
+    """O texto sai como veio, como no .docx: a meia-risca entre números é intervalo.
+
+    A limpeza antiga trocava o travessão por vírgula e apagava a meia-risca, e
+    "2020–2023" virava "20202023".
+    """
     md_file = tmp_path / "documento.md"
     md_file.write_text(
-        "Isenção do Imposto sobre Produtos Industrializados – IPI –, na aquisição de automóveis.\n",
+        "Produtos Industrializados – IPI –, na aquisição. Vigência 2020–2023, p. 10–15. O prazo — curto — vence.\n",
         encoding="utf-8",
     )
 
     html = converter_md_para_html(md_file)
-    assert "Industrializados, IPI, na aquisição" in html
+    assert "Industrializados – IPI –, na aquisição" in html
+    assert "2020–2023" in html
+    assert "p. 10–15" in html
+    assert "O prazo — curto — vence" in html
 
 
 def test_md_tabela_com_linha_incompleta_formata_todas_as_celulas(tmp_path):
@@ -158,3 +165,32 @@ def test_tabela_do_markdown_sai_centralizada():
     html = converter_documento_memoria("t.md", md.encode("utf-8"), so_corpo=True)["arquivos"][0]["conteudo"]
     # Markdown não informa largura: a tabela ocupa a página
     assert '<table align="center" border="1" cellpadding="1" cellspacing="1" width="100%">' in html
+
+
+def test_md_link_com_parenteses_no_endereco_e_sem_cor_embutida(tmp_path):
+    """O link vai inteiro, e sai como o do Word: sem <span> de cor nem <u> na saída."""
+    md_file = tmp_path / "links.md"
+    md_file.write_text("Ver [a lei](https://pt.wikipedia.org/wiki/Lei_(direito)) hoje.\n", encoding="utf-8")
+
+    html = converter_md_para_html(md_file)
+    assert '<a href="https://pt.wikipedia.org/wiki/Lei_(direito)">a lei</a> hoje.' in html
+    assert "color" not in html and "<u>" not in html
+
+
+def test_md_link_com_esquema_inseguro_fica_so_o_texto(tmp_path):
+    md_file = tmp_path / "links.md"
+    md_file.write_text("Veja [clique](javascript:alert(1)) agora.\n", encoding="utf-8")
+
+    html = converter_md_para_html(md_file)
+    assert "<a" not in html
+    assert "Veja clique agora." in html
+
+
+def test_md_marcador_mais_vira_item_de_lista(tmp_path):
+    """"+ " é marcador no CommonMark, e a página já trata esse texto colado como Markdown."""
+    md_file = tmp_path / "lista.md"
+    md_file.write_text("+ primeiro\n+ segundo\n", encoding="utf-8")
+
+    html = converter_md_para_html(md_file)
+    assert '<li class="Texto_Justificado">primeiro</li>' in html
+    assert "+" not in html

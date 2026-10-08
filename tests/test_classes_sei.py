@@ -697,16 +697,26 @@ def test_estilo_de_corpo_em_celula_de_tabela_nao_vale():
 # -- Regressão da quarta revisão ---------------------------------------------------------
 
 
-def test_secao_de_nivel_1_do_odt_nao_vira_titulo_em_caixa_alta():
-    """O "#" que o leitor de ODT escreve é seção, e não o título do documento."""
+def test_titulo_sem_numero_do_odt_vira_item_como_o_titulo_do_word():
+    """O Título N do LibreOffice é seção do documento, como o Título N do Word: Item_NivelN."""
     content = _content_odt(
         "",
         '<text:h text:outline-level="1">Introdução</text:h><text:p>Texto.</text:p>'
-        '<text:h text:outline-level="1">Análise</text:h><text:p>Mais texto.</text:p>',
+        '<text:h text:outline-level="2">Contexto</text:h><text:p>Mais texto.</text:p>'
+        '<text:h text:outline-level="1">Análise</text:h><text:p>Outro texto.</text:p>',
     )
     obtido = classes_por_texto(_corpo("t.odt", _odt_bytes(content)))
-    assert obtido["Introdução"] == "Texto_Centralizado"
-    assert obtido["Análise"] == "Texto_Centralizado"
+    assert obtido["Introdução"] == "Item_Nivel1"
+    assert obtido["Contexto"] == "Item_Nivel2"
+    assert obtido["Análise"] == "Item_Nivel1"
+
+    def montar(doc):
+        doc.add_heading("Introdução", 1)
+        doc.add_paragraph("Texto.")
+        doc.add_heading("Contexto", 2)
+
+    word = classes_por_texto(_corpo("t.docx", _docx(montar)))
+    assert (word["Introdução"], word["Contexto"]) == (obtido["Introdução"], obtido["Contexto"])
 
 
 def test_titulo_de_nivel_1_do_markdown_continua_em_caixa_alta():
@@ -868,3 +878,51 @@ def test_odt_marcas_aninhadas_no_trecho_nao_deixam_asterisco(propriedades, esper
     corpo = _corpo("t.odt", _odt_bytes(content))
     assert "*" not in corpo and "~~" not in corpo
     assert esperado in corpo
+
+
+# -- Listas do ODT -----------------------------------------------------------------------
+
+ESTILO_DE_LISTA_ODT = (
+    '<text:list-style style:name="L1">'
+    '<text:list-level-style-number text:level="1" style:num-suffix="." style:num-format="1"/>'
+    '<text:list-level-style-number text:level="2" style:num-suffix=")" style:num-format="a"/>'
+    '<text:list-level-style-bullet text:level="3" text:bullet-char="•"/>'
+    "</text:list-style>"
+)
+
+
+def test_lista_numerada_do_odt_escreve_o_numero_no_texto():
+    """Como a <ol> do HTML: o número fica no texto e não entra na numeração do SEI."""
+    content = _content_odt(
+        ESTILO_DE_LISTA_ODT,
+        '<text:list text:style-name="L1">'
+        "<text:list-item><text:p>Primeira pergunta</text:p>"
+        "<text:list><text:list-item><text:p>detalhe um</text:p></text:list-item>"
+        "<text:list-item><text:p>detalhe dois</text:p>"
+        "<text:list><text:list-item><text:p>marcador</text:p></text:list-item></text:list>"
+        "</text:list-item></text:list></text:list-item>"
+        '<text:list-item text:start-value="5"><text:p>Quinta pergunta</text:p></text:list-item>'
+        "</text:list>",
+    )
+    corpo = _corpo("t.odt", _odt_bytes(content))
+    obtido = classes_por_texto(corpo)
+    assert obtido["1. Primeira pergunta"] == "Texto_Justificado"
+    assert obtido["a) detalhe um"] == "Texto_Justificado"
+    assert obtido["b) detalhe dois"] == "Texto_Justificado"
+    assert obtido["5. Quinta pergunta"] == "Texto_Justificado"
+    assert 'Texto_Justificado">marcador</li>' in corpo
+    assert "Item_Nivel" not in corpo
+
+
+def test_lista_com_marcadores_do_odt_mantem_os_niveis():
+    content = _content_odt(
+        "",
+        "<text:list><text:list-item><text:p>um</text:p>"
+        "<text:list><text:list-item><text:p>um.a</text:p></text:list-item></text:list>"
+        "</text:list-item><text:list-item><text:p>dois</text:p></text:list-item></text:list>",
+    )
+    corpo = _corpo("t.odt", _odt_bytes(content))
+    assert re.sub(r"\s", "", corpo) == (
+        '<ul><liclass="Texto_Justificado">um<ul><liclass="Texto_Justificado">um.a</li></ul></li>'
+        '<liclass="Texto_Justificado">dois</li></ul>'
+    )

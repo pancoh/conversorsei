@@ -5,6 +5,25 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+- **Travessões preservados.** O travessão e a meia-risca ficam no texto em todos os formatos,
+  como já ficavam no Word. Antes, nos outros formatos, o travessão virava vírgula e a
+  meia-risca sumia: "2020–2023" saía "20202023".
+- **Títulos do LibreOffice como os do Word.** O título sem número de um .odt passa a sair
+  como item numerado do SEI, no nível do título, como o Título 1 do Word.
+- **Listas do LibreOffice.** A lista numerada de um .odt sai com o número escrito no texto
+  ("1.", "a)"), como a lista numerada colada, e a lista com marcadores mantém os subníveis.
+- **Notas de rodapé do Word.** As notas passam para o fim do texto, numa seção Notas, com a
+  chamada entre colchetes ([1], [2]), como já acontecia no .odt. Antes, elas se perdiam.
+- **Parágrafo sem numeração no Word.** O parágrafo em que a numeração foi desligada deixa de
+  sair como item numerado.
+- **Links.** O link sai sem cor e sublinhado embutidos, como o do Word, e o endereço com
+  parênteses fica inteiro. Link que executaria código (javascript:) sai como texto.
+- **Linha de comando.** `--max-nivel` aceita só de 1 a 4, os níveis do SEI. `--saida` com
+  mais de um arquivo passa a dar erro, em vez de ser ignorada. O `--json` traz os trechos de
+  citação e de cabeçalho.
+- **Privacidade.** A página, o rodapé e o README descrevem do mesmo jeito o que a contagem
+  de acessos registra.
+
 ## 0.6.1 (2026-10-08)
 
 - **Imagens do Word no tamanho da página.** A imagem passa a sair com a largura que tem no

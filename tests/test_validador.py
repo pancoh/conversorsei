@@ -105,3 +105,12 @@ def test_documento_grande_nao_recebe_aviso_de_tamanho():
     """O limite de tamanho era o do plugin SEI Pro: a colagem direta leva o documento inteiro."""
     texto = '<p class="Texto_Justificado">' + "a" * 30000 + "</p>"
     assert validar_html_sei(texto) == []
+
+
+def test_validar_arquivo_so_avisa_a_cerca_quando_a_origem_e_markdown(tmp_path):
+    from conversorsei.validador import validar_arquivo_sei
+
+    arquivo = tmp_path / "saida_SEI.html"
+    arquivo.write_text('<body><p class="Texto_Justificado">```</p></body>', encoding="utf-8")
+    assert validar_arquivo_sei(arquivo) == []
+    assert any("três crases" in aviso for aviso in validar_arquivo_sei(arquivo, origem_markdown=True))

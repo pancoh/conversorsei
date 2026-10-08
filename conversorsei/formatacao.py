@@ -270,6 +270,30 @@ class CitacaoPorRecuo:
 
 
 PALAVRAS_DO_TRECHO = 12
+ROMANOS = ((1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"),
+           (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"))  # fmt: skip
+
+
+def numero_da_lista(posicao: int, tipo: str) -> str:
+    """O número de um item de lista numerada, sem pontuação: "3", "c", "C", "iii", "III".
+
+    `tipo` segue o atributo type do <ol> e o num-format do ODT ("1", "a", "A", "i", "I").
+    Comum aos leitores de HTML e de ODT, que escrevem o número no texto do parágrafo.
+    """
+    if tipo in ("a", "A") and posicao > 0:
+        letras = ""
+        while posicao > 0:
+            posicao, resto = divmod(posicao - 1, 26)
+            letras = chr(ord("a") + resto) + letras
+        return letras.upper() if tipo == "A" else letras
+    if tipo in ("i", "I") and posicao > 0:
+        romano = ""
+        for valor, simbolo in ROMANOS:
+            while posicao >= valor:
+                romano += simbolo
+                posicao -= valor
+        return romano if tipo == "I" else romano.lower()
+    return str(posicao)
 
 
 def trecho_inicial(texto: str) -> str:

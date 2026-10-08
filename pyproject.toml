@@ -1,7 +1,7 @@
 [project]
 name = "conversorsei"
 version = "0.6.1"
-description = "Conversor universal de documentos (DOCX, PDF, MD) para o padrão do editor SEI"
+description = "Conversor de documentos (DOCX, ODT, PDF, HTML, Markdown e TXT) para o padrão do editor SEI"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -43,7 +43,7 @@ ignore = ["E501"]
 [tool.mypy]
 python_version = "3.11"
 files = ["conversorsei", "scripts"]
-# O python-docx e o pypdf nao distribuem tipos completos
+# O python-docx e o pypdf não distribuem tipos completos
 ignore_missing_imports = true
 warn_redundant_casts = true
 warn_unused_ignores = true
@@ -52,8 +52,8 @@ warn_unreachable = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-# O teste no navegador (tests/test_navegador.py) fica fora da suíte padrão: precisa do
-# Chromium do Playwright e de rede. Roda com "pytest -m e2e"; o -m da linha de comando
+# Os testes no navegador (tests/test_navegador.py e tests/test_numeracao_navegador.py)
+# ficam fora da suíte padrão: precisam do Chromium e do WebKit do Playwright e de rede. Roda com "pytest -m e2e"; o -m da linha de comando
 # substitui este
 addopts = "-m 'not e2e'"
-markers = ["e2e: abre a página no Chromium do Playwright (precisa de rede para o CDN do Pyodide)"]
+markers = ["e2e: abre a página no Chromium e no WebKit do Playwright (precisa de rede para o CDN do Pyodide)"]

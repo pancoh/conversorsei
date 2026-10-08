@@ -93,6 +93,12 @@ def test_html_das_novidades_escapa_o_texto_e_traduz_o_negrito():
     assert "Em desenvolvimento" not in bundle_web.html_das_novidades(bundle_web.ler_historico(vazio))
 
 
+def test_crases_do_historico_viram_codigo_no_quadro():
+    """O histórico cita opções da linha de comando entre crases, que não podem aparecer cruas."""
+    assert bundle_web._inline("Saem `--unico` e `<x>`.") == "Saem <code>--unico</code> e <code>&lt;x&gt;</code>."
+    assert "`" not in (RAIZ / "docs" / "index.html").read_text(encoding="utf-8").split("novidades:inicio")[1]
+
+
 def test_notas_da_release_tem_cada_bloco_numa_linha(monkeypatch, tmp_path):
     changelog = tmp_path / "CHANGELOG.md"
     changelog.write_text(HISTORICO, encoding="utf-8")

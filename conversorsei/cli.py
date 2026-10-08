@@ -166,6 +166,17 @@ def observar(args: argparse.Namespace, alvos: list[str], outdir: Path | None, va
         return 0
 
 
+def nivel_maximo(valor: str) -> int:
+    """O SEI só tem Item_Nivel1 a Item_Nivel4: fora disso, a classe gerada não existiria."""
+    try:
+        nivel = int(valor)
+    except ValueError:
+        nivel = 0
+    if not 1 <= nivel <= 4:
+        raise argparse.ArgumentTypeError(f"use um número de 1 a 4 (recebido: {valor})")
+    return nivel
+
+
 def criar_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="conversorsei",
@@ -192,13 +203,16 @@ Exemplos de uso:
         "--outdir",
         type=Path,
         default=None,
-        help="Diretório de destino dos arquivos HTML gerados (padrão se omitido alvo: dados/saida/).",
+        help=(
+            "Diretório de destino dos arquivos HTML gerados. Sem ele, a saída vai para a pasta de cada "
+            "entrada; sem alvo, para dados/saida/ (ou saida/, quando a pasta lida é entrada/)."
+        ),
     )
     parser.add_argument(
         "--saida",
         type=Path,
         default=None,
-        help="Nome explícito do arquivo de saída (aplicável quando houver apenas um arquivo de entrada).",
+        help="Nome explícito do arquivo de saída. Só vale com um único arquivo de entrada.",
     )
     parser.add_argument(
         "--corpo",
@@ -207,9 +221,12 @@ Exemplos de uso:
     )
     parser.add_argument(
         "--max-nivel",
-        type=int,
+        type=nivel_maximo,
         default=4,
-        help="Profundidade máxima de Item_Nivel (padrão: 4; níveis mais profundos viram alíneas).",
+        help=(
+            "Profundidade máxima do item numerado digitado no texto ('1.1.1.'), de 1 a 4 (padrão: 4). "
+            "Os níveis mais profundos viram alíneas. Títulos e listas do Word mantêm o nível que têm."
+        ),
     )
     parser.add_argument(
         "-r",
@@ -284,10 +301,16 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return observar(args, alvos, outdir, validar)
 
+    um_arquivo = len(alvos) == 1 and Path(alvos[0]).is_file()
+    if args.saida and not um_arquivo:
+        # Antes, a opção era ignorada em silêncio, e a saída saía com o nome padrão
+        print("ERRO: --saida define o nome de um arquivo só e vale apenas com um arquivo de entrada.", file=sys.stderr)
+        return 1
+
     resultados = []
     total_erros = 0
 
-    if len(alvos) == 1 and Path(alvos[0]).is_file() and args.saida:
+    if um_arquivo and args.saida:
         res = converter_documento(
             caminho_entrada=alvos[0],
             caminho_saida=args.saida,
@@ -348,7 +371,10 @@ def main(argv: list[str] | None = None) -> int:
                 "avisos": r.avisos,
                 "citacoes_por_recuo": r.citacoes_por_recuo,
                 "citacoes_entre_aspas": r.citacoes_entre_aspas,
+                # Os mesmos campos que a interface web recebe
+                "citacoes_trechos": r.citacoes_trechos,
                 "cabecalho_paragrafos": len(r.cabecalho_trechos),
+                "cabecalho_trechos": r.cabecalho_trechos,
             }
             for r in resultados
         ]

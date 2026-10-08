@@ -184,6 +184,18 @@ def test_docx_lista_numerada_apos_titulo_vira_subitem(tmp_path):
     assert 'class="Item_Nivel2"' in html_corpo
 
 
+def test_docx_numid_zero_tira_a_numeracao(tmp_path):
+    """numId 0 é como o Word desliga a numeração herdada: o parágrafo segue texto comum."""
+    doc_path = tmp_path / "sem_numeracao.docx"
+    doc = docx.Document()
+    _adicionar_numeracao(doc.add_paragraph("Parágrafo comum, sem número, com várias palavras de texto."), num_id=0)
+    doc.save(doc_path)
+
+    html_corpo = converter_docx_para_html(doc_path)
+    assert 'class="Texto_Justificado"' in html_corpo
+    assert "Numerado" not in html_corpo and "Item_Nivel" not in html_corpo
+
+
 def test_docx_lista_com_marcadores_recebe_classe_sei(tmp_path):
     doc_path = tmp_path / "bullets.docx"
     doc = docx.Document()
@@ -673,3 +685,99 @@ def test_estilo_do_paragrafo_nao_e_buscado_de_novo_a_cada_leitura(monkeypatch):
     doc.save(buffer)
     converter_docx_para_blocos(io.BytesIO(buffer.getvalue()))
     assert chamadas <= 5, f"{chamadas} buscas de estilo para 300 parágrafos"
+
+
+def test_endereco_seguro_so_deixa_esquemas_de_link_comuns():
+    from conversorsei.docx_converter import endereco_seguro
+
+    assert endereco_seguro("https://www.gov.br/") == "https://www.gov.br/"
+    assert endereco_seguro("mailto:sei@gov.br") == "mailto:sei@gov.br"
+    assert endereco_seguro("anexo.pdf") == "anexo.pdf"
+    for perigoso in ("javascript:alert(1)", "JavaScript:alert(1)", " java\tscript:x", "data:text/html,x", "vbscript:x"):
+        assert endereco_seguro(perigoso) is None, perigoso
+
+
+def test_docx_hyperlink_com_esquema_inseguro_vira_texto(tmp_path):
+    from docx.opc.constants import RELATIONSHIP_TYPE
+
+    doc = docx.Document()
+    p = doc.add_paragraph()
+    r_id = p.part.relate_to("javascript:alert(1)", RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), r_id)
+    run = OxmlElement("w:r")
+    texto = OxmlElement("w:t")
+    texto.text = "clique"
+    run.append(texto)
+    link.append(run)
+    p._p.append(link)
+    buffer = io.BytesIO()
+    doc.save(buffer)
+
+    html_corpo = converter_docx_para_html(buffer.getvalue())
+    assert "<a" not in html_corpo
+    assert "clique" in html_corpo
+
+
+def _docx_com_notas(chamadas: list[str], notas: dict[str, str]) -> bytes:
+    """Documento com notas de rodapé de verdade: a parte footnotes.xml e as chamadas no texto.
+
+    `chamadas` traz o texto de cada parágrafo; "{id}" marca a chamada da nota com esse id.
+    """
+    from docx.opc.constants import RELATIONSHIP_TYPE
+    from docx.opc.packuri import PackURI
+    from docx.opc.part import Part
+
+    ns = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    corpo = "".join(
+        f'<w:footnote w:id="{id_nota}"><w:p><w:r><w:footnoteRef/></w:r>'
+        f'<w:r><w:t xml:space="preserve"> {texto}</w:t></w:r></w:p></w:footnote>'
+        for id_nota, texto in notas.items()
+    )
+    xml = (
+        f'<w:footnotes {ns}><w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>'
+        f"{corpo}</w:footnotes>"
+    ).encode()
+    doc = docx.Document()
+    parte = Part(
+        PackURI("/word/footnotes.xml"),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml",
+        xml,
+        doc.part.package,
+    )
+    doc.part.relate_to(parte, RELATIONSHIP_TYPE.FOOTNOTES)
+    for texto in chamadas:
+        p = doc.add_paragraph()
+        for pedaco in re.split(r"(\{[^}]+\})", texto):
+            if pedaco.startswith("{"):
+                run = OxmlElement("w:r")
+                ref = OxmlElement("w:footnoteReference")
+                ref.set(qn("w:id"), pedaco[1:-1])
+                run.append(ref)
+                p._p.append(run)
+            elif pedaco:
+                p.add_run(pedaco)
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    return buffer.getvalue()
+
+
+def test_docx_notas_de_rodape_vao_para_o_fim_como_no_odt():
+    """A chamada vira [n] pela ordem no texto (e não pelo id), e as notas fecham o documento."""
+    from conversorsei.core import converter_bytes
+
+    conteudo = _docx_com_notas(
+        ["Primeiro fato{7}.", "Segundo fato{3} e de novo{7}."],
+        {"3": "Fonte do segundo.", "7": "Fonte do primeiro."},
+    )
+    res = converter_bytes("notas.docx", conteudo)
+    assert res.sucesso, res.erros
+    paragrafos = re.findall(r'<p class="[^"]+">.*?</p>', res.arquivos[0].conteudo)
+    assert paragrafos == [
+        '<p class="Texto_Justificado">Primeiro fato[1].</p>',
+        '<p class="Texto_Justificado">Segundo fato[2] e de novo[1].</p>',
+        '<p class="Texto_Centralizado"><strong>Notas</strong></p>',
+        '<p class="Texto_Justificado">Nota 1: Fonte do primeiro.</p>',
+        '<p class="Texto_Justificado">Nota 2: Fonte do segundo.</p>',
+    ]
+    assert any("seção Notas" in aviso for aviso in res.avisos)

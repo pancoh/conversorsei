@@ -11,9 +11,10 @@ from typing import Any
 
 from docx import Document
 
-# docx.Document e a fabrica; o tipo do objeto vive em docx.document
+# docx.Document é a fábrica; o tipo do objeto vive em docx.document
 from docx.document import Document as DocumentoWord
 from docx.enum.style import WD_STYLE_TYPE
+from docx.oxml import parse_xml
 from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
@@ -61,8 +62,28 @@ RE_STRIP_ITEM = re.compile(r"^((?:<[^/!][^>]*>\s*)*)\d+(?:\.\d+)*\.?\s*[-–—]
 # Par de tags de formatação sem nada dentro, como o "<strong></strong>" que sobra quando
 # só o número estava em negrito. Sem espaço dentro: "<strong> </strong>" separa palavras
 RE_TAG_VAZIA = re.compile(r"<(strong|em|u|s|span)(?:\s[^>]*)?></\1>")
-# Converte links Markdown literais residuais [texto](url) em <a>
-RE_MD_LINK = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
+# Converte links Markdown literais residuais [texto](url) em <a>. O endereço pode ter um
+# par de parênteses, como os da Wikipédia ("..._(direito)")
+RE_MD_LINK = re.compile(r"\[([^\]]+)\]\((https?://(?:[^()\s]|\([^()\s]*\))+)\)")
+# Esquemas que viram link na saída. "javascript:" e "data:" executariam código ou abririam
+# conteúdo arbitrário no clique, dentro do SEI; endereço sem esquema (relativo) fica
+ESQUEMAS_DE_LINK = frozenset({"http", "https", "mailto", "tel", "ftp"})
+RE_ESQUEMA = re.compile(r"^([A-Za-z][A-Za-z0-9+.\-]*):")
+
+
+def endereco_seguro(href: str | None) -> str | None:
+    """O endereço, se ele pode virar link na saída; None quando o esquema não é permitido.
+
+    O navegador ignora espaços e caracteres de controle no esquema ("java\\tscript:"), e
+    por isso eles saem antes da conferência.
+    """
+    endereco = (href or "").strip()
+    if not endereco:
+        return None
+    esquema = RE_ESQUEMA.match(re.sub(r"[\x00-\x20]", "", endereco))
+    if esquema and esquema.group(1).lower() not in ESQUEMAS_DE_LINK:
+        return None
+    return endereco
 
 MAX_NIVEL_PADRAO = 4
 
@@ -414,12 +435,15 @@ def formatacao_do_paragrafo(p: Paragraph, alin: str | None) -> Formatacao:
 def formato_lista_xml(doc: DocumentoWord, p: Paragraph) -> tuple[str | None, int | None]:
     """Inspeciona numbering.xml para descobrir o numFmt real de listas no Word."""
     pPr = p._p.pPr
-    # Os filhos de numPr sao gerados em tempo de execucao e nao aparecem nos stubs
+    # Os filhos de numPr são gerados em tempo de execução e não aparecem nos stubs
     numPr = pPr.numPr if pPr is not None else None
     if numPr is None or numPr.numId is None:  # type: ignore[attr-defined]
         return None, None
     num_id = str(numPr.numId.val)  # type: ignore[attr-defined]
     ilvl = str(numPr.ilvl.val if numPr.ilvl is not None else 0)  # type: ignore[attr-defined]
+    # numId 0 é como o Word tira a numeração herdada do estilo: o parágrafo não é item
+    if num_id == "0":
+        return None, None
     try:
         numbering = doc.part.numbering_part.element
     except Exception:
@@ -625,6 +649,65 @@ def dimensoes_no_sei(doc: DocumentoWord, blip, blob: bytes) -> tuple[int, int] |
     return largura, max(1, round(largura * proporcao))
 
 
+# Notas de rodapé: a chamada vira "[1]" no texto e a nota vai para uma seção "Notas" no
+# fim, como no leitor de ODT. O SEI não tem nota de rodapé, e descartá-la perdia conteúdo
+AVISO_NOTAS = (
+    "As notas de rodapé foram para o fim do texto, na seção Notas, com a chamada entre colchetes "
+    "([1], [2]). Confira antes de colar."
+)
+REL_NOTAS_DE_RODAPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
+
+
+def _texto_da_nota(nota) -> str:
+    """Texto de uma w:footnote, com os parágrafos separados por " / ", como no ODT."""
+    paragrafos = []
+    for p in nota.iter(qn("w:p")):
+        partes = []
+        for el in p.iter(qn("w:t"), qn("w:tab"), qn("w:br")):
+            partes.append(el.text or "" if el.tag == qn("w:t") else " ")
+        texto = re.sub(r"\s+", " ", "".join(partes)).strip()
+        if texto:
+            paragrafos.append(texto)
+    return " / ".join(paragrafos)
+
+
+def notas_de_rodape(doc: DocumentoWord) -> tuple[dict[str, int], list[tuple[int, str]]]:
+    """Número de cada chamada (pelo id da nota) e o texto das notas, na ordem do documento.
+
+    O Word numera as notas pela ordem em que aparecem, e não pelo id, que pode pular.
+    Calculado uma vez por documento.
+    """
+    cache = _CACHE_ESTILOS.setdefault(doc.part, {})
+    if "notas" not in cache:
+        textos: dict[str, str] = {}
+        for rel in doc.part.rels.values():
+            if rel.reltype == REL_NOTAS_DE_RODAPE and not rel.is_external:
+                raiz = parse_xml(rel.target_part.blob)
+                for nota in raiz.iter(qn("w:footnote")):
+                    if nota.get(qn("w:type")) in (None, "normal"):
+                        textos[nota.get(qn("w:id")) or ""] = _texto_da_nota(nota)
+        numeros: dict[str, int] = {}
+        notas: list[tuple[int, str]] = []
+        for chamada in doc.element.body.iter(qn("w:footnoteReference")):
+            id_nota = chamada.get(qn("w:id")) or ""
+            if id_nota in numeros or id_nota not in textos:
+                continue
+            numeros[id_nota] = len(numeros) + 1
+            notas.append((numeros[id_nota], textos[id_nota]))
+        cache["notas"] = (numeros, notas)
+    return cache["notas"]
+
+
+def blocos_das_notas(doc: DocumentoWord) -> list[str]:
+    """A seção "Notas" do fim do documento, no mesmo formato da que sai do ODT."""
+    _, notas = notas_de_rodape(doc)
+    if not notas:
+        return []
+    return ['<p class="Texto_Centralizado"><strong>Notas</strong></p>'] + [
+        f'<p class="Texto_Justificado">Nota {numero}: {esc(texto)}</p>' for numero, texto in notas if texto
+    ]
+
+
 def run_para_html(doc: DocumentoWord, run_el, p: Paragraph, estilos_do_paragrafo: list | None = None) -> str:
     """Converte um <w:r> em HTML inline (negrito, itálico, imagens Base64, etc.)."""
     from docx.text.run import Run
@@ -642,6 +725,12 @@ def run_para_html(doc: DocumentoWord, run_el, p: Paragraph, estilos_do_paragrafo
             dimensoes = dimensoes_no_sei(doc, blip, parte.blob)
             tamanho = f'width="{dimensoes[0]}" height="{dimensoes[1]}" ' if dimensoes else ""
             partes.append(f'<img alt="" {tamanho}src="data:{ct};base64,{b64}" style="max-width:100%;" />')
+
+    # Chamada de nota de rodapé: o número da nota, entre colchetes, como no ODT
+    for chamada in run_el.findall(qn("w:footnoteReference")):
+        numero = notas_de_rodape(doc)[0].get(chamada.get(qn("w:id")) or "")
+        if numero:
+            partes.append(f"[{numero}]")
 
     # run.text já traduz <w:br> e <w:cr> em "\n" e <w:tab> em "\t", preservando a ordem
     texto = run.text or ""
@@ -697,7 +786,7 @@ def paragrafo_inline(doc: DocumentoWord, p: Paragraph) -> str:
             href = None
             if rid:
                 try:
-                    href = p.part.rels[rid].target_ref
+                    href = endereco_seguro(p.part.rels[rid].target_ref)
                 except Exception:
                     href = None
             inner = "".join(run_para_html(doc, r, p, estilos) for r in child.findall(qn("w:r")))
@@ -860,8 +949,10 @@ def converter_paragrafo(
             # Documento de parágrafos numerados: sem caixa alta nem tarja cinza
             cls = f"Paragrafo_Numerado_Nivel{prof}" if prof <= 3 else "Item_Alinea_Letra"
         else:
-            # Acima do nível máximo, vira alínea (a, b, c)
-            cls = f"Item_Nivel{prof}" if prof <= max_nivel else "Item_Alinea_Letra"
+            # Acima do nível máximo, vira alínea (a, b, c). O SEI só tem Item_Nivel1 a 4: um
+            # limite maior geraria Item_Nivel5, classe que o editor não conhece
+            limite = max(1, min(max_nivel, MAX_NIVEL_PADRAO))
+            cls = f"Item_Nivel{prof}" if prof <= limite else "Item_Alinea_Letra"
     else:
         cls = classe_do_paragrafo(
             doc,
@@ -1247,8 +1338,10 @@ def converter_docx_para_blocos(
     with abrir_binario(caminho_docx, "documento.docx") as binario:
         doc = Document(binario)
     if avisos is not None:
-        if any(True for _ in doc.element.body.iter(qn("w:footnoteReference"))):
-            avisos.append("O documento tem notas de rodapé que não foram incorporadas. Confira o original antes de colar.")
+        if notas_de_rodape(doc)[1]:
+            avisos.append(AVISO_NOTAS)
+        if any(True for _ in doc.element.body.iter(qn("w:endnoteReference"))):
+            avisos.append("O documento tem notas de fim que não foram incorporadas. Confira o original antes de colar.")
         if any(True for _ in doc.element.body.iter(qn("w:txbxContent"))):
             avisos.append("O documento tem caixa de texto que pode não aparecer no HTML. Confira o original antes de colar.")
     blocos: list[str] = []
@@ -1295,7 +1388,7 @@ def converter_docx_para_blocos(
     if lista is not None:
         blocos.append(renderizar_lista(lista))
 
-    return ajustar_assinaturas(blocos)
+    return ajustar_assinaturas(blocos) + blocos_das_notas(doc)
 
 
 def converter_docx_para_html(

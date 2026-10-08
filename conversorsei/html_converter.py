@@ -20,6 +20,7 @@ import re
 from dataclasses import dataclass, field, replace
 from html.parser import HTMLParser
 
+from conversorsei.docx_converter import endereco_seguro
 from conversorsei.entrada import FonteDocumento, ler_bytes, nome_da_fonte
 from conversorsei.formatacao import (
     ESTILO_NUMERO_LITERAL,
@@ -29,6 +30,7 @@ from conversorsei.formatacao import (
     classe_sei_pelo_nome,
     indices_de_assinatura,
     linha_curta,
+    numero_da_lista,
     pode_ser_linha_de_assinatura,
 )
 from conversorsei.md_converter import (
@@ -128,26 +130,12 @@ TIPO_POR_ESTILO_DE_LISTA = {
     "lower-roman": "i",
     "upper-roman": "I",
 }
-ROMANOS = ((1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"),
-           (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"))  # fmt: skip
-
-
 def numero_do_item(posicao: int, tipo: str) -> str:
     """O número de um item de <ol>, como se escreve no texto: "1.", "a)", "A)", "I -"."""
-    if tipo in ("a", "A") and posicao > 0:
-        letras = ""
-        while posicao > 0:
-            posicao, resto = divmod(posicao - 1, 26)
-            letras = chr(ord("a") + resto) + letras
-        return f"{letras.upper() if tipo == 'A' else letras})"
-    if tipo in ("i", "I") and posicao > 0:
-        romano = ""
-        for valor, simbolo in ROMANOS:
-            while posicao >= valor:
-                romano += simbolo
-                posicao -= valor
-        return f"{romano if tipo == 'I' else romano.lower()} -"
-    return f"{posicao}."
+    numero = numero_da_lista(posicao, tipo)
+    if numero[0].isdigit():
+        return f"{numero}."
+    return f"{numero} -" if tipo in ("i", "I") else f"{numero})"
 
 
 def assinatura_em_linhas(texto: str) -> list[str]:
@@ -330,8 +318,9 @@ def enfase_do_no(no: No, herdada: Enfase) -> Enfase:
 
 
 def _endereco_do_link(href: str) -> str | None:
-    href = href.strip()
-    if not href or href.startswith(("#", "javascript:")):
+    """O endereço do <a> no Markdown, ou None quando não vira link (âncora, esquema inseguro)."""
+    href = endereco_seguro(href) or ""
+    if not href or href.startswith("#"):
         return None
     # Parêntese e espaço encerrariam o endereço no Markdown
     return href.replace(" ", "%20").replace("(", "%28").replace(")", "%29")

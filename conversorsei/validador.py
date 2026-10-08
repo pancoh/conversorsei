@@ -154,10 +154,14 @@ def validar_html_sei(html: str, origem_markdown: bool = True) -> list[str]:
     return falhas
 
 
-def validar_arquivo_sei(caminho: str | Path) -> list[str]:
-    """Lê um arquivo HTML do disco e valida."""
+def validar_arquivo_sei(caminho: str | Path, origem_markdown: bool = False) -> list[str]:
+    """Lê um arquivo HTML do disco e valida.
+
+    O arquivo não diz de que formato veio. Por isso o aviso de "```" sem fechamento, que
+    só faz sentido para entrada .md, fica desligado, salvo pedido em `origem_markdown`.
+    """
     p = Path(caminho)
     if not p.is_file():
         return [f"Arquivo não encontrado: {caminho}"]
     conteudo = p.read_text(encoding="utf-8", errors="replace")
-    return validar_html_sei(conteudo)
+    return validar_html_sei(conteudo, origem_markdown=origem_markdown)

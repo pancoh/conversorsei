@@ -235,8 +235,9 @@ def ultima_versao(versoes: list[Versao]) -> Versao:
 
 
 def _inline(texto: str) -> str:
-    """Escapa o texto e traduz o **negrito**, a única marca que o histórico usa."""
-    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escape(texto, quote=False))
+    """Escapa o texto e traduz as marcas que o histórico usa: **negrito** e `código`."""
+    html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escape(texto, quote=False))
+    return re.sub(r"`([^`]+)`", r"<code>\1</code>", html)
 
 
 def html_das_novidades(versoes: list[Versao]) -> str:

@@ -7,7 +7,7 @@
 <h1 align="center">Conversor SEI</h1>
 
 <p align="center">
-  Transforma documentos do Word, do LibreOffice e em PDF em texto pronto para colar no editor do <strong>SEI</strong>,<br>
+  Transforma documentos do Word, do LibreOffice, em PDF, HTML e Markdown, e também texto copiado, em conteúdo pronto para o editor do <strong>SEI</strong>,<br>
   com a formatação e a numeração do padrão institucional.
 </p>
 
@@ -57,7 +57,7 @@ do SEI e você cola o resultado pronto no editor.
 | **Seu documento não sai do computador** | A conversão acontece dentro do próprio navegador. Nenhum arquivo é enviado para a internet. |
 | **Funciona sem internet** | Depois da primeira visita, a página abre mesmo desconectada. Também pode ser instalada como aplicativo. |
 | **Numeração automática** | Itens, subitens, incisos e alíneas usam a numeração do SEI, sem repetir o número digitado no documento. |
-| **Tabelas e imagens** | As tabelas saem centralizadas e com a largura do Word. As imagens vão junto com o texto. |
+| **Tabelas e imagens** | As tabelas saem centralizadas e com a largura do Word. As imagens do Word (.docx) vão junto com o texto; nos outros formatos, o resultado avisa para inseri-las no SEI. |
 | **PDF digitalizado** | O reconhecimento de texto (OCR) roda no navegador. O resultado pede conferência. |
 | **Documentos grandes** | O documento sai inteiro, num arquivo só: uma cópia e uma colagem, por maior que ele seja. |
 | **Gratuito** | Sem cadastro, sem anúncios e sem limite de uso. |
@@ -169,9 +169,10 @@ O GitHub Actions roda todas as verificações e só publica a página se elas pa
 
 ## <img src=".github/readme/privacidade.svg" width="24" height="24" alt=""> Privacidade
 
-A página registra estatísticas anônimas de uso pelo GoatCounter, sem cookies: número de
-acessos, formato dos arquivos convertidos e resultado da conversão. O nome e o conteúdo dos
-documentos nunca são registrados.
+A página registra estatísticas anônimas de uso pelo GoatCounter, sem cookies: acessos e
+conversões, com o formato dos arquivos e o resultado. O contador também recebe dados gerais do
+acesso, como navegador, tamanho da tela e país. O nome e o conteúdo dos documentos nunca são
+registrados.
 
 ## <img src=".github/readme/apoio.svg" width="24" height="24" alt=""> Apoie o projeto
 

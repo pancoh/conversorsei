@@ -138,6 +138,7 @@ def test_odt_preserva_texto_da_nota_de_rodape(tmp_path):
     html = res.arquivos_gerados[0].read_text(encoding="utf-8")
     assert "Fonte do dado." in html
     assert "Nota 1:" in html
+    assert any("seção Notas" in aviso for aviso in res.avisos)
 
 
 def test_odt_preserva_celula_mesclada_sem_gerar_celula_extra(tmp_path):

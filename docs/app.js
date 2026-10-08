@@ -193,12 +193,12 @@ function semNomesDeArquivo(texto) {
     .filter(nome => nome.length > 2)
     .sort((a, b) => b.length - a.length);
   for (const nome of nomes) limpo = limpo.split(nome).join('<arquivo>');
-  return limpo.replace(/[^\s[\]:|"'()]+\.(docx?|odt|pdf|md|txt|rtf|html)\b/gi, '<arquivo>');
+  return limpo.replace(/[^\s[\]:|"'()]+\.(docx?|odt|pdf|md|txt|rtf|html?)\b/gi, '<arquivo>');
 }
 
-// A marca de versão do app.js, gravada pelo bundle_web.py, identifica a publicação
-// A versão do CHANGELOG.md e a marca do app.js: entre dois lançamentos, a página muda
-// sem mudar de número, e só a marca diz qual código a pessoa estava usando
+// A versão do CHANGELOG.md e a marca do app.js, gravada pelo bundle_web.py: entre dois
+// lançamentos, a página muda sem mudar de número, e só a marca diz qual código a pessoa
+// estava usando
 function versaoDaPagina() {
   const script = document.querySelector('script[src*="app.js?v="]');
   const marca = script ? new URL(script.src).searchParams.get('v') : 'desconhecida';
@@ -1233,7 +1233,7 @@ function renderCitacao(recuo, aspas, documentos, trechos) {
         : `${total} parágrafos ${forma}${onde} foram convertidos como Citação.`;
     }
     btnCitacao.textContent = 'Manter citações como texto';
-    resCitacaoResumo.textContent = `Citações: ${total} convertidas`;
+    resCitacaoResumo.textContent = `Citações: ${total} ${um ? 'convertida' : 'convertidas'}`;
   } else {
     if (recuo && aspas) {
       resCitacaoTexto.textContent =
@@ -1248,7 +1248,7 @@ function renderCitacao(recuo, aspas, documentos, trechos) {
         : `${total} parágrafos${onde} estão em citações entre aspas com mais de uma linha. Eles saíram como texto comum.`;
     }
     btnCitacao.textContent = 'Converter como citação';
-    resCitacaoResumo.textContent = `Citações: ${total} possíveis`;
+    resCitacaoResumo.textContent = `Citações: ${total} ${um ? 'possível' : 'possíveis'}`;
   }
   const itens = trechos.slice(0, MAXIMO_TRECHOS).map(t => `<li>${escapeHtml(t)}</li>`);
   if (trechos.length > MAXIMO_TRECHOS) {

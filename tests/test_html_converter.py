@@ -312,3 +312,12 @@ def test_numero_do_item(posicao, tipo, esperado):
     from conversorsei.html_converter import numero_do_item
 
     assert numero_do_item(posicao, tipo) == esperado
+
+
+def test_html_link_com_esquema_inseguro_fica_so_o_texto():
+    """A conferência do esquema não depende da caixa: "JavaScript:" também fica de fora."""
+    markdown = _markdown(
+        '<p><a href="JavaScript:alert(1)">um</a> <a href="data:text/html,x">dois</a> '
+        '<a href="mailto:sei@gov.br">três</a></p>'
+    )
+    assert markdown.strip() == "um dois [três](mailto:sei@gov.br)"
