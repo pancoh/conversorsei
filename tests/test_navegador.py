@@ -228,6 +228,11 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     _enviar(pagina)
     pagina.locator("button.btn-copy").wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
     assert not privacidade.is_visible()
+    # O link do rodapé traz o quadro de volta, já aberto
+    pagina.click("#btn-privacidade")
+    assert privacidade.is_visible() and privacidade.evaluate("el => el.open")
+    assert "LGPD" in privacidade.inner_text()
+    privacidade.locator("summary").click()
     assert pagina.locator("#results-section").evaluate(
         "el => el.previousElementSibling.id === 'pyodide-status-card'"
     )

@@ -323,6 +323,15 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Depois da primeira conversão, o quadro de privacidade some com as instruções da área de
+// envio. O link do rodapé o mostra de novo, já aberto
+document.getElementById('btn-privacidade').addEventListener('click', () => {
+  const privacidade = document.getElementById('drop-ajuda');
+  privacidade.classList.remove('hidden');
+  privacidade.open = true;
+  privacidade.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
 // Janela das novidades: abre pela versão do rodapé, fecha no X, no Esc ou no fundo, e
 // devolve o foco ao botão. O histórico já vem no HTML, gravado pelo bundle_web.py
 const novidadesModal = document.getElementById('novidades-modal');
