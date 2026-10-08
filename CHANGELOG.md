@@ -9,7 +9,8 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
   que a área de transferência estava vazia.
 - **Privacidade e LGPD mais à mão.** O quadro "Seus documentos não saem do seu computador"
   ganhou um parágrafo sobre a LGPD e diz que nada vai para a nuvem. O link "Privacidade e
-  LGPD", no rodapé, mostra o quadro também depois da primeira conversão.
+  LGPD", no rodapé, mostra o quadro também depois da primeira conversão. Cada item do
+  quadro ganhou um ícone, para achar o assunto com mais facilidade.
 
 ## 0.7.5 (2026-10-08)
 

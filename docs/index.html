@@ -17,7 +17,7 @@
   <!-- Bibliotecas servidas localmente (vendor/), com versão fixa e sem depender de CDN de terceiros -->
   <!-- O ?v= é a marca de versão do conteúdo, gravada por scripts/bundle_web.py: cada versão
        tem um endereço próprio, e nenhum cache entrega o HTML novo com o CSS ou o app.js antigo -->
-  <link href="estilos.css?v=627bf50339" rel="stylesheet">
+  <link href="estilos.css?v=759dfc346b" rel="stylesheet">
   <link href="vendor/fonts.css" rel="stylesheet">
   <script src="vendor/lucide-1.33.0.min.js"></script>
   <script src="vendor/jszip-3.10.1.min.js"></script>
@@ -184,13 +184,13 @@
           <i data-lucide="chevron-down" class="privacidade-chevron w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200"></i>
         </summary>
         <div class="mt-2 max-w-lg mx-auto text-left text-sm text-slate-600 bg-white border border-slate-200 rounded-lg p-4 space-y-2">
-          <p><strong class="font-semibold text-slate-700">Sem envio.</strong> A conversão é feita pelo seu navegador. O conteúdo do documento não é enviado a servidores, a serviços de nuvem nem a serviços de inteligência artificial.</p>
-          <p><strong class="font-semibold text-slate-700">Sem armazenamento.</strong> Não há conta nem histórico. O documento não fica guardado: ao fechar a aba, ele some da página. Ninguém tem acesso ao que você converte, nem quem mantém o site.</p>
-          <p><strong class="font-semibold text-slate-700">LGPD.</strong> Como o documento não sai do seu computador, o site não recebe nem trata os dados pessoais que ele contém. Eles continuam no seu equipamento, sob a mesma responsabilidade de antes da conversão.</p>
-          <p><strong class="font-semibold text-slate-700">Regras fixas.</strong> O conversor não usa inteligência artificial: aplica regras de formatação, e o mesmo documento dá sempre o mesmo resultado. O reconhecimento de texto de PDF digitalizado (OCR) também roda no navegador.</p>
-          <p><strong class="font-semibold text-slate-700">Como conferir.</strong> Depois de abrir a página, desligue a internet e converta um documento. A conversão continua funcionando. O código é aberto e pode ser conferido no <a href="https://github.com/pancoh/conversorsei" target="_blank" rel="noopener" class="text-blue-700 underline underline-offset-2">GitHub</a>.</p>
-          <p><strong class="font-semibold text-slate-700">O que a página registra.</strong> A contagem de acessos e de conversões, com o formato dos arquivos e o resultado, pelo GoatCounter, sem cookies. O contador também recebe dados gerais do acesso, como navegador, tamanho da tela e país. O nome e o conteúdo dos documentos nunca são registrados.</p>
-          <p class="text-slate-500">Um cuidado que vale para qualquer documento: o texto copiado para o SEI fica na área de transferência até você copiar outra coisa. Em computador compartilhado, lembre-se disso.</p>
+          <p class="flex gap-2.5"><i data-lucide="cloud-off" class="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400"></i><span><strong class="font-semibold text-slate-700">Sem envio.</strong> A conversão é feita pelo seu navegador. O conteúdo do documento não é enviado a servidores, a serviços de nuvem nem a serviços de inteligência artificial.</span></p>
+          <p class="flex gap-2.5"><i data-lucide="eye-off" class="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400"></i><span><strong class="font-semibold text-slate-700">Sem armazenamento.</strong> Não há conta nem histórico. O documento não fica guardado: ao fechar a aba, ele some da página. Ninguém tem acesso ao que você converte, nem quem mantém o site.</span></p>
+          <p class="flex gap-2.5"><i data-lucide="scale" class="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400"></i><span><strong class="font-semibold text-slate-700">LGPD.</strong> Como o documento não sai do seu computador, o site não recebe nem trata os dados pessoais que ele contém. Eles continuam no seu equipamento, sob a mesma responsabilidade de antes da conversão.</span></p>
+          <p class="flex gap-2.5"><i data-lucide="list-checks" class="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400"></i><span><strong class="font-semibold text-slate-700">Regras fixas.</strong> O conversor não usa inteligência artificial: aplica regras de formatação, e o mesmo documento dá sempre o mesmo resultado. O reconhecimento de texto de PDF digitalizado (OCR) também roda no navegador.</span></p>
+          <p class="flex gap-2.5"><i data-lucide="wifi-off" class="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400"></i><span><strong class="font-semibold text-slate-700">Como conferir.</strong> Depois de abrir a página, desligue a internet e converta um documento. A conversão continua funcionando. O código é aberto e pode ser conferido no <a href="https://github.com/pancoh/conversorsei" target="_blank" rel="noopener" class="text-blue-700 underline underline-offset-2">GitHub</a>.</span></p>
+          <p class="flex gap-2.5"><i data-lucide="chart-column" class="w-4 h-4 mt-0.5 flex-shrink-0 text-slate-400"></i><span><strong class="font-semibold text-slate-700">O que a página registra.</strong> A contagem de acessos e de conversões, com o formato dos arquivos e o resultado, pelo GoatCounter, sem cookies. O contador também recebe dados gerais do acesso, como navegador, tamanho da tela e país. O nome e o conteúdo dos documentos nunca são registrados.</span></p>
+          <p class="flex gap-2.5 text-slate-500 border-t border-slate-100 pt-2"><i data-lucide="triangle-alert" class="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600"></i><span>Um cuidado que vale para qualquer documento: o texto copiado para o SEI fica na área de transferência até você copiar outra coisa. Em computador compartilhado, lembre-se disso.</span></p>
         </div>
       </details>
     </div>
@@ -363,7 +363,7 @@
         <!-- novidades:inicio -->
         <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Em desenvolvimento <span class="font-normal text-slate-500">já na página</span></h4>
-          <ul class="list-disc pl-5 space-y-1.5"><li><strong>"Colar texto" sem nada copiado abre o campo para colar.</strong> Antes, o botão só avisava que a área de transferência estava vazia.</li><li><strong>Privacidade e LGPD mais à mão.</strong> O quadro "Seus documentos não saem do seu computador" ganhou um parágrafo sobre a LGPD e diz que nada vai para a nuvem. O link "Privacidade e LGPD", no rodapé, mostra o quadro também depois da primeira conversão.</li></ul>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>"Colar texto" sem nada copiado abre o campo para colar.</strong> Antes, o botão só avisava que a área de transferência estava vazia.</li><li><strong>Privacidade e LGPD mais à mão.</strong> O quadro "Seus documentos não saem do seu computador" ganhou um parágrafo sobre a LGPD e diz que nada vai para a nuvem. O link "Privacidade e LGPD", no rodapé, mostra o quadro também depois da primeira conversão. Cada item do quadro ganhou um ícone, para achar o assunto com mais facilidade.</li></ul>
         </section>
         <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Versão 0.7.5 <span class="font-normal text-slate-500">8 de outubro de 2026</span></h4>
