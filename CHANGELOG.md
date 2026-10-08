@@ -5,6 +5,8 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+## 0.7.1 (2026-10-08)
+
 - **Saída em lote protegida.** Na linha de comando, documentos que gerariam o mesmo arquivo
   recebem um aviso de erro, sem sobrescrever a primeira saída. O modo watch conserva as
   subpastas de entrada. A limpeza das partes antigas apaga apenas arquivos com a numeração
