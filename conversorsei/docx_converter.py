@@ -39,6 +39,13 @@ from conversorsei.formatacao import (
 
 NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+NS_WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+
+# Largura, em px, que uma imagem com a largura toda da área de texto do Word recebe no SEI.
+# Sem largura no <img>, o editor do SEI mostrava a foto no tamanho original (1.600 px de
+# uma câmera), muito maior que a página. 800 px ficou bom colado no SEI
+LARGURA_DA_PAGINA_SEI_PX = 800
+EMU_POR_TWIP = 635
 
 RE_NUM_DECIMAL = re.compile(r"^\s*\d+(\.\d+)*\.?\s*[-–—]?\s+")
 RE_NUM_ROMANO = re.compile(r"^\s*[IVXLCDM]+\s*[-–—.)]\s+")
@@ -552,6 +559,72 @@ def classe_do_paragrafo(
     return "Texto_Justificado"
 
 
+def dimensoes_em_pixels(blob: bytes) -> tuple[int, int] | None:
+    """Largura e altura em pixels de uma imagem PNG, JPEG ou GIF, lidas do cabeçalho.
+
+    Serve só para não ampliar a imagem além do tamanho original. Lê o cabeçalho à mão
+    para não depender de uma biblioteca de imagens, que pesaria no carregamento da página.
+    Formato desconhecido ou cabeçalho estranho devolve None.
+    """
+    if blob[:8] == b"\x89PNG\r\n\x1a\n" and len(blob) >= 24:
+        return int.from_bytes(blob[16:20], "big"), int.from_bytes(blob[20:24], "big")
+    if blob[:6] in (b"GIF87a", b"GIF89a") and len(blob) >= 10:
+        return int.from_bytes(blob[6:8], "little"), int.from_bytes(blob[8:10], "little")
+    if blob[:2] == b"\xff\xd8":
+        i = 2
+        while i + 9 < len(blob):
+            if blob[i] != 0xFF:
+                return None
+            marca = blob[i + 1]
+            if marca == 0xFF:
+                i += 1
+                continue
+            tamanho = int.from_bytes(blob[i + 2 : i + 4], "big")
+            # SOF0 a SOF15, menos DHT (C4), JPG (C8) e DAC (CC), trazem as dimensões
+            if 0xC0 <= marca <= 0xCF and marca not in (0xC4, 0xC8, 0xCC):
+                altura = int.from_bytes(blob[i + 5 : i + 7], "big")
+                largura = int.from_bytes(blob[i + 7 : i + 9], "big")
+                return (largura, altura) if largura and altura else None
+            i += 2 + tamanho
+    return None
+
+
+def dimensoes_no_sei(doc: DocumentoWord, blip, blob: bytes) -> tuple[int, int] | None:
+    """Largura e altura, em px, com que a imagem deve aparecer no SEI.
+
+    A largura guarda a proporção que a imagem tem na página do Word: a fração da área de
+    texto que ela ocupa (wp:extent) vezes LARGURA_DA_PAGINA_SEI_PX. Assim, a foto na
+    largura da página fica perto de 800 px e um logotipo pequeno continua pequeno. Nunca
+    passa do tamanho original, para não ampliar a imagem. A altura segue a proporção.
+    Sem medida no Word, vale o tamanho original limitado à largura da página; sem nenhuma
+    medida, devolve None e o <img> sai sem tamanho, como antes.
+    """
+    original = dimensoes_em_pixels(blob)
+    desenho = blip.getparent()
+    while desenho is not None and desenho.tag not in (f"{{{NS_WP}}}inline", f"{{{NS_WP}}}anchor"):
+        desenho = desenho.getparent()
+    extent = desenho.find(f"{{{NS_WP}}}extent") if desenho is not None else None
+    try:
+        cx, cy = int(extent.get("cx")), int(extent.get("cy"))  # type: ignore[union-attr]
+    except (AttributeError, TypeError, ValueError):
+        cx = cy = 0
+
+    if cx > 0 and cy > 0:
+        area = _area_de_texto(doc)
+        fracao = min(1.0, cx / (area * EMU_POR_TWIP)) if area else 1.0
+        largura = round(fracao * LARGURA_DA_PAGINA_SEI_PX)
+        proporcao = cy / cx
+    elif original:
+        largura = min(original[0], LARGURA_DA_PAGINA_SEI_PX)
+        proporcao = original[1] / original[0]
+    else:
+        return None
+    if original:
+        largura = min(largura, original[0])
+    largura = max(1, largura)
+    return largura, max(1, round(largura * proporcao))
+
+
 def run_para_html(doc: DocumentoWord, run_el, p: Paragraph, estilos_do_paragrafo: list | None = None) -> str:
     """Converte um <w:r> em HTML inline (negrito, itálico, imagens Base64, etc.)."""
     from docx.text.run import Run
@@ -566,7 +639,9 @@ def run_para_html(doc: DocumentoWord, run_el, p: Paragraph, estilos_do_paragrafo
             parte = p.part.related_parts[rid]
             b64 = base64.b64encode(parte.blob).decode("ascii")
             ct = parte.content_type
-            partes.append(f'<img alt="" src="data:{ct};base64,{b64}" style="max-width:100%;" />')
+            dimensoes = dimensoes_no_sei(doc, blip, parte.blob)
+            tamanho = f'width="{dimensoes[0]}" height="{dimensoes[1]}" ' if dimensoes else ""
+            partes.append(f'<img alt="" {tamanho}src="data:{ct};base64,{b64}" style="max-width:100%;" />')
 
     # run.text já traduz <w:br> e <w:cr> em "\n" e <w:tab> em "\t", preservando a ordem
     texto = run.text or ""

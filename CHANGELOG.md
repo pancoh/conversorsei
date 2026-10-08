@@ -5,6 +5,11 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+- **Imagens do Word no tamanho da página.** A imagem passa a sair com a largura que tem no
+  Word, proporcional à página: a foto na largura toda fica com cerca de 800 px no SEI, e a
+  altura acompanha. Antes, a foto aparecia no tamanho original, muito maior que a página, e
+  precisava ser reduzida à mão. A imagem nunca é ampliada além do tamanho original.
+
 ## 0.6.0 (2026-10-08)
 
 - **Documento inteiro num arquivo só.** O documento longo deixa de ser dividido em partes:

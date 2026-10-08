@@ -432,6 +432,61 @@ def test_larguras_da_tabela_vao_como_atributo_e_nao_no_style():
     assert all('width="' in td for td in celulas[:3])
 
 
+
+def _png(largura: int, altura: int) -> bytes:
+    """PNG cinza do tamanho pedido, montado sem biblioteca de imagens."""
+    import struct
+    import zlib
+
+    def pedaco(tipo: bytes, dados: bytes) -> bytes:
+        return struct.pack(">I", len(dados)) + tipo + dados + struct.pack(">I", zlib.crc32(tipo + dados))
+
+    cabecalho = struct.pack(">IIBBBBB", largura, altura, 8, 0, 0, 0, 0)
+    linhas = b"".join(b"\x00" + b"\x80" * largura for _ in range(altura))
+    return (
+        b"\x89PNG\r\n\x1a\n" + pedaco(b"IHDR", cabecalho) + pedaco(b"IDAT", zlib.compress(linhas))
+        + pedaco(b"IEND", b"")
+    )
+
+
+def _tamanhos_das_imagens(imagens: list[tuple[bytes, float]]) -> list[tuple[int, int]]:
+    """Converte um DOCX com cada imagem na largura pedida (em polegadas) e lê width e height."""
+    from docx.shared import Inches
+
+    doc = docx.Document()  # Carta, margens de 1,25": área de texto de 6"
+    for conteudo, polegadas in imagens:
+        doc.add_picture(io.BytesIO(conteudo), width=Inches(polegadas))
+    html = "\n".join(converter_docx_para_blocos(_salvar_em_memoria(doc)))
+    return [(int(w), int(h)) for w, h in re.findall(r'<img alt="" width="(\d+)" height="(\d+)"', html)]
+
+
+def test_imagem_sai_com_a_proporcao_da_pagina_do_word():
+    """Sem largura no <img>, o SEI mostrava a foto no tamanho original (1.600 px de câmera).
+
+    A largura toda da área de texto vale 800 px no SEI; a imagem guarda a fração da página
+    que ocupa no Word, e a altura segue a proporção. Vai como atributo, e não no style.
+    """
+    foto = _png(1600, 800)
+    assert _tamanhos_das_imagens([(foto, 6.0), (foto, 1.5)]) == [(800, 400), (200, 100)]
+
+
+def test_imagem_pequena_nao_e_ampliada():
+    """Uma imagem de 100 px esticada no Word até a largura da página continua com 100 px."""
+    assert _tamanhos_das_imagens([(_png(100, 50), 6.0)]) == [(100, 50)]
+
+
+def test_dimensoes_em_pixels_le_png_gif_e_jpeg():
+    from conversorsei.docx_converter import dimensoes_em_pixels
+
+    assert dimensoes_em_pixels(_png(30, 20)) == (30, 20)
+    assert dimensoes_em_pixels(b"GIF89a" + (640).to_bytes(2, "little") + (480).to_bytes(2, "little") + b"\x00") == (640, 480)
+    # JPEG: SOI, um APP0 qualquer e o SOF0 com altura 915 e largura 1600
+    app0 = b"\xff\xe0" + (16).to_bytes(2, "big") + b"JFIF\x00" + b"\x00" * 9
+    sof0 = b"\xff\xc0" + (17).to_bytes(2, "big") + b"\x08" + (915).to_bytes(2, "big") + (1600).to_bytes(2, "big")
+    assert dimensoes_em_pixels(b"\xff\xd8" + app0 + sof0 + b"\x03" + b"\x00" * 9) == (1600, 915)
+    assert dimensoes_em_pixels(b"formato desconhecido") is None
+
+
 def _salvar_em_memoria(doc) -> bytes:
     saida = io.BytesIO()
     doc.save(saida)
