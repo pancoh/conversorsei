@@ -59,7 +59,7 @@ do SEI e você cola o resultado pronto no editor.
 | **Numeração automática** | Itens, subitens, incisos e alíneas usam a numeração do SEI, sem repetir o número digitado no documento. |
 | **Tabelas e imagens** | As tabelas saem centralizadas e com a largura do Word. As imagens vão junto com o texto. |
 | **PDF digitalizado** | O reconhecimento de texto (OCR) roda no navegador. O resultado pede conferência. |
-| **Documentos grandes** | Quando o texto passa do limite do SEI, o conversor divide em partes para você colar uma de cada vez. |
+| **Documentos grandes** | O documento sai inteiro, num arquivo só: uma cópia e uma colagem, por maior que ele seja. |
 | **Gratuito** | Sem cadastro, sem anúncios e sem limite de uso. |
 
 ## <img src=".github/readme/formatos.svg" width="24" height="24" alt=""> Formatos aceitos
@@ -88,8 +88,6 @@ original antes de salvar no SEI.
 3. Clique em **Copiar para o SEI**.
 4. No SEI, abra o editor, clique no corpo do documento e cole com `Ctrl+V` (no Mac, `Cmd+V`).
 5. Confira o resultado, principalmente a numeração, as tabelas e as imagens, e salve.
-
-Se o documento foi dividido em partes, copie e cole uma parte de cada vez, na ordem indicada.
 
 <a id="duvidas"></a>
 

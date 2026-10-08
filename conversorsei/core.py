@@ -5,10 +5,8 @@ from __future__ import annotations
 
 import html as htmlmod
 import re
-from collections.abc import Iterable
 from contextlib import closing
 from dataclasses import dataclass, field
-from functools import cached_property
 from pathlib import Path
 from zipfile import BadZipFile
 
@@ -17,18 +15,8 @@ from conversorsei.entrada import FonteDocumento, StreamNomeado
 from conversorsei.formatacao import CitacaoPorRecuo, trecho_inicial
 from conversorsei.html_converter import EXTENSOES_HTML, converter_html_para_blocos
 from conversorsei.md_converter import converter_md_para_blocos
+from conversorsei.montagem import TITULO_DA_SAIDA, apagar_partes_antigas, derivar_caminho_saida, montar_html
 from conversorsei.odt_converter import converter_odt_para_blocos
-from conversorsei.particionador import (
-    MAX_KB_PADRAO,
-    TITULO_DA_SAIDA,
-    avancar_contadores,
-    contadores_zerados,
-    derivar_caminho_saida,
-    dividir_em_partes,
-    limpar_saidas_antigas,
-    montar_html,
-    orcamento_corpo,
-)
 from conversorsei.pdf_converter import converter_pdf_para_blocos, converter_texto_de_pdf_para_blocos
 from conversorsei.validador import validar_html_sei
 
@@ -64,15 +52,6 @@ class ArquivoSEI:
 
     nome: str
     conteudo: str
-
-    @cached_property
-    def tamanho_bytes(self) -> int:
-        """Tamanho em bytes do conteúdo já codificado, medido uma vez só.
-
-        Quem consome lê o tamanho mais de uma vez (bytes e KB), e recodificar o
-        documento inteiro a cada leitura pesa no navegador.
-        """
-        return len(self.conteudo.encode("utf-8"))
 
 
 @dataclass
@@ -218,70 +197,29 @@ def extrair_blocos_documento(
     return extrair_blocos_de_fonte(p, p.suffix, max_nivel=max_nivel, citacao=citacao, avisos=avisos)
 
 
-def avisos_de_blocos_grandes(blocos: list[str], max_kb: int, so_corpo: bool, forcar_unico: bool) -> list[str]:
-    """Explica quando uma imagem sozinha impede a divisão automática."""
-    if forcar_unico:
-        return []
-    limite = orcamento_corpo(max_kb, so_corpo=so_corpo)
-    if any("<img " in bloco and len(bloco.encode("utf-8")) > limite for bloco in blocos):
-        return [
-            "Uma imagem incorporada ficou maior que o tamanho permitido por parte. "
-            "A divisão automática não consegue cortá-la. Reduza a imagem no documento original e converta de novo."
-        ]
-    return []
-
-
-def montar_saidas(
-    blocos: list[str],
-    nome_base: str,
-    sufixo: str = ".html",
-    so_corpo: bool = False,
-    forcar_unico: bool = False,
-    forcar_partes: bool = False,
-    max_kb: int = MAX_KB_PADRAO,
-) -> list[tuple[str, str]]:
-    """Divide os blocos em partes e devolve os pares (nome do arquivo, conteúdo).
+def montar_saida(blocos: list[str], nome_base: str, sufixo: str = ".html", so_corpo: bool = False) -> tuple[str, str]:
+    """Junta os blocos num arquivo só e devolve o par (nome do arquivo, conteúdo).
 
     É a parte da conversão que não toca no disco, compartilhada por quem grava arquivos
-    (a CLI) e por quem devolve texto (a interface web).
+    (a CLI) e por quem devolve texto (a interface web). O documento sai inteiro: a cópia
+    e a colagem no editor do SEI levam a formatação de um documento longo, e a divisão em
+    partes, feita para o limite do plugin SEI Pro, só obrigava a colar várias vezes.
     """
-    partes = [blocos] if forcar_unico else dividir_em_partes(blocos, orcamento_corpo(max_kb, so_corpo=so_corpo))
-
-    def renderizar(corpo: str, contadores: dict[str, int] | None = None) -> str:
-        return corpo + "\n" if so_corpo else montar_html(corpo, contadores=contadores)
-
-    if len(partes) <= 1 and not forcar_partes:
-        return [(f"{nome_base}{sufixo}", renderizar("\n".join(blocos)))]
-
-    saidas: list[tuple[str, str]] = []
-    # Cada parte começa a numeração de onde a anterior parou
-    contadores = contadores_zerados()
-    for i, parte in enumerate(partes, 1):
-        corpo_parte = "\n".join(parte)
-        saidas.append((f"{nome_base}_parte{i:02d}{sufixo}", renderizar(corpo_parte, contadores=contadores)))
-        contadores = avancar_contadores(contadores, corpo_parte)
-    return saidas
+    corpo = "\n".join(blocos)
+    conteudo = corpo + "\n" if so_corpo else montar_html(corpo)
+    return f"{nome_base}{sufixo}", conteudo
 
 
-def validar_saidas(
-    saidas: Iterable[tuple[str, str]], forcar_unico: bool = False, origem_markdown: bool = True
-) -> list[str]:
-    """Valida cada saída e devolve os avisos já identificados pelo nome do arquivo.
+def validar_saida(conteudo: str, origem_markdown: bool = True) -> list[str]:
+    """Valida o HTML gerado e devolve os avisos.
 
     Compartilhada pelas duas conversões, para que a da web e a do disco não passem a
     avisar coisas diferentes sobre o mesmo HTML. `origem_markdown` diz se a entrada era
     .md: só aí ">", "```" e "~~" que sobraram no HTML indicam marcação não convertida.
+    Os avisos não levam o nome do arquivo gerado: há um por documento, e quem mostra o
+    aviso já diz de qual documento ele é.
     """
-    avisos: list[str] = []
-    for idx, (nome, conteudo) in enumerate(saidas):
-        falhas = validar_html_sei(
-            conteudo,
-            validar_tamanho=not forcar_unico,
-            eh_continuidade=(idx > 0),
-            origem_markdown=origem_markdown,
-        )
-        avisos.extend(f"[{nome}] {f}" for f in falhas)
-    return avisos
+    return validar_html_sei(conteudo, origem_markdown=origem_markdown)
 
 
 def converter_documento(
@@ -289,9 +227,6 @@ def converter_documento(
     caminho_saida: str | Path | None = None,
     outdir: str | Path | None = None,
     so_corpo: bool = False,
-    forcar_unico: bool = False,
-    forcar_partes: bool = False,
-    max_kb: int = MAX_KB_PADRAO,
     max_nivel: int = 4,
     validar: bool = True,
     citacao_por_recuo: bool = False,
@@ -329,7 +264,7 @@ def converter_documento(
         resultado.erros.append(f"Nenhum conteúdo extraído de {p_in.name}.")
         return resultado
     blocos, resultado.cabecalho_trechos = aplicar_cabecalho(blocos, omitir_cabecalho)
-    resultado.avisos = avisos_extracao + avisos_de_blocos_grandes(blocos, max_kb, so_corpo, forcar_unico)
+    resultado.avisos = avisos_extracao
 
     if caminho_saida is not None:
         saida_base = Path(caminho_saida)
@@ -338,32 +273,15 @@ def converter_documento(
 
     saida_base.parent.mkdir(parents=True, exist_ok=True)
 
-    saidas = montar_saidas(
-        blocos,
-        nome_base=saida_base.stem,
-        sufixo=saida_base.suffix,
-        so_corpo=so_corpo,
-        forcar_unico=forcar_unico,
-        forcar_partes=forcar_partes,
-        max_kb=max_kb,
-    )
-    # Uma parte só ainda é saída em partes quando --partes força o sufixo _parte01:
-    # o arquivo único anterior precisa sair, para os dois não conviverem na pasta
-    limpar_saidas_antigas(saida_base, gerar_partes=len(saidas) > 1 or forcar_partes)
-
-    gerados: list[Path] = []
-    for nome, conteudo in saidas:
-        caminho = saida_base.parent / nome
-        caminho.write_text(conteudo, encoding="utf-8")
-        gerados.append(caminho)
-
-    resultado.arquivos_gerados = gerados
+    nome, conteudo = montar_saida(blocos, nome_base=saida_base.stem, sufixo=saida_base.suffix, so_corpo=so_corpo)
+    apagar_partes_antigas(saida_base)
+    caminho = saida_base.parent / nome
+    caminho.write_text(conteudo, encoding="utf-8")
+    resultado.arquivos_gerados = [caminho]
 
     if validar:
         # Valida o que acabou de ser montado, em vez de reler do disco o que já está aqui
-        resultado.avisos.extend(validar_saidas(
-            saidas, forcar_unico=forcar_unico, origem_markdown=p_in.suffix.lower() == ".md"
-        ))
+        resultado.avisos.extend(validar_saida(conteudo, origem_markdown=p_in.suffix.lower() == ".md"))
 
     return resultado
 
@@ -372,9 +290,6 @@ def converter_bytes(
     nome_arquivo: str,
     conteudo: bytes,
     so_corpo: bool = False,
-    forcar_unico: bool = False,
-    forcar_partes: bool = False,
-    max_kb: int = MAX_KB_PADRAO,
     max_nivel: int = 4,
     validar: bool = True,
     citacao_por_recuo: bool = False,
@@ -431,27 +346,17 @@ def converter_bytes(
         resultado.erros.append(f"Nenhum conteúdo extraído de {origem.name}.")
         return resultado
     blocos, resultado.cabecalho_trechos = aplicar_cabecalho(blocos, omitir_cabecalho)
-    resultado.avisos = avisos_extracao + avisos_de_blocos_grandes(blocos, max_kb, so_corpo, forcar_unico)
+    resultado.avisos = avisos_extracao
 
     # A convenção de nomes é a mesma da conversão em disco (Nota_Tecnica_ vira
     # Nota_Tecnica_SEI_), para que os arquivos baixados pela web não destoem da CLI
     saida = derivar_caminho_saida(origem, so_corpo=so_corpo)
 
-    saidas = montar_saidas(
-        blocos,
-        nome_base=saida.stem,
-        sufixo=saida.suffix,
-        so_corpo=so_corpo,
-        forcar_unico=forcar_unico,
-        forcar_partes=forcar_partes,
-        max_kb=max_kb,
-    )
-    resultado.arquivos = [ArquivoSEI(nome=nome, conteudo=texto) for nome, texto in saidas]
+    nome, conteudo_saida = montar_saida(blocos, nome_base=saida.stem, sufixo=saida.suffix, so_corpo=so_corpo)
+    resultado.arquivos = [ArquivoSEI(nome=nome, conteudo=conteudo_saida)]
 
     if validar:
-        resultado.avisos.extend(validar_saidas(
-            saidas, forcar_unico=forcar_unico, origem_markdown=origem.suffix.lower() == ".md"
-        ))
+        resultado.avisos.extend(validar_saida(conteudo_saida, origem_markdown=origem.suffix.lower() == ".md"))
 
     return resultado
 
@@ -468,8 +373,9 @@ def entra_na_varredura(arquivo: Path) -> bool:
     return not eh_saida_do_conversor(arquivo)
 
 
-# Nomes que derivar_caminho_saida e montar_saidas dão à saída: "nota_SEI.html",
-# "nota_SEI_parte02.html", "nota_SEI_corpo_parte02.html" e "Nota_Tecnica_SEI_12.html"
+# Nomes que derivar_caminho_saida dá à saída: "nota_SEI.html", "nota_SEI_corpo.html" e
+# "Nota_Tecnica_SEI_12.html". O "_parte02" é das versões que dividiam o documento: as
+# partes velhas que ficaram numa pasta também não podem ser convertidas de novo
 RE_NOME_DA_SAIDA = re.compile(r"(?:_SEI|^Nota_Tecnica_SEI_.*?)(?:_corpo)?(?:_parte\d+)?\.html?$", re.IGNORECASE)
 
 
@@ -498,9 +404,6 @@ def converter_diretorio(
     outdir: str | Path | None = None,
     recursivo: bool = False,
     so_corpo: bool = False,
-    forcar_unico: bool = False,
-    forcar_partes: bool = False,
-    max_kb: int = MAX_KB_PADRAO,
     max_nivel: int = 4,
     validar: bool = True,
     citacao_por_recuo: bool = False,
@@ -525,9 +428,6 @@ def converter_diretorio(
             caminho_entrada=arq,
             outdir=destino_pasta,
             so_corpo=so_corpo,
-            forcar_unico=forcar_unico,
-            forcar_partes=forcar_partes,
-            max_kb=max_kb,
             max_nivel=max_nivel,
             validar=validar,
             citacao_por_recuo=citacao_por_recuo,

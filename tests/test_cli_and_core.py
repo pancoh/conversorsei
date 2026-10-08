@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from conversorsei.cli import main
 from conversorsei.core import converter_diretorio, converter_documento
 
@@ -60,7 +62,7 @@ def test_cli_conversao_json(tmp_path, capsys):
 
 
 def test_cli_corpo_gera_fragmento_sem_head(tmp_path):
-    """--corpo entrega só o fragmento, pronto para o plugin 'inserir HTML' do SEI Pro."""
+    """--corpo entrega só o fragmento, sem <head> nem <style>."""
     entrada = tmp_path / "minuta.md"
     entrada.write_text("# 1. ASSUNTO\n\n1.1. Texto do corpo.", encoding="utf-8")
 
@@ -73,41 +75,29 @@ def test_cli_corpo_gera_fragmento_sem_head(tmp_path):
     assert 'class="Item_Nivel1"' in conteudo
 
 
-def test_cli_partes_forca_nomenclatura(tmp_path):
-    """--partes mantém o sufixo _parte01 mesmo quando o documento caberia num arquivo só."""
-    entrada = tmp_path / "curta.md"
-    entrada.write_text("# 1. ASSUNTO\n\n1.1. Documento curto.", encoding="utf-8")
-
-    assert main([str(entrada), "-o", str(tmp_path), "--partes"]) == 0
-    assert (tmp_path / "curta_SEI_parte01.html").is_file()
-    assert not (tmp_path / "curta_SEI.html").is_file()
-
-
-def test_cli_unico_desativa_divisao(tmp_path):
-    """--unico gera um arquivo só, ainda que ultrapasse o alvo de tamanho."""
+def test_cli_converte_documento_longo_em_um_arquivo_e_apaga_partes_antigas(tmp_path):
+    """O documento longo sai num arquivo só, e as partes de versões anteriores saem da pasta."""
     linhas = []
     for i in range(1, 40):
         linhas.append(f"# {i}. SECAO {i}")
         linhas.append("Texto de preenchimento. " * 40)
     entrada = tmp_path / "grande.md"
     entrada.write_text("\n\n".join(linhas), encoding="utf-8")
+    (tmp_path / "grande_SEI_parte01.html").write_text("parte antiga", encoding="utf-8")
 
-    assert main([str(entrada), "-o", str(tmp_path), "--unico"]) == 0
+    assert main([str(entrada), "-o", str(tmp_path)]) == 0
     assert (tmp_path / "grande_SEI.html").is_file()
     assert not list(tmp_path.glob("grande_SEI_parte*.html"))
 
 
-def test_cli_troca_entre_unico_e_partes_limpa_saida_antiga(tmp_path):
-    """Arquivo único e partes são mutuamente exclusivos: a saída anterior é removida."""
+def test_cli_recusa_as_opcoes_de_divisao_retiradas(tmp_path):
+    """--unico, --partes e --max-kb saíram com a divisão em partes."""
     entrada = tmp_path / "doc.md"
     entrada.write_text("# 1. ASSUNTO\n\n1.1. Texto.", encoding="utf-8")
 
-    main([str(entrada), "-o", str(tmp_path), "--partes"])
-    assert (tmp_path / "doc_SEI_parte01.html").is_file()
-
-    main([str(entrada), "-o", str(tmp_path)])
-    assert (tmp_path / "doc_SEI.html").is_file()
-    assert not list(tmp_path.glob("doc_SEI_parte*.html"))
+    for opcao in (["--unico"], ["--partes"], ["--max-kb", "18"]):
+        with pytest.raises(SystemExit):
+            main([str(entrada), "-o", str(tmp_path), *opcao])
 
 
 def test_core_converte_readme_quando_solicitado(tmp_path):
@@ -230,19 +220,6 @@ def test_watch_converte_e_encerra_no_ctrl_c(tmp_path, monkeypatch, capsys):
     assert "minuta.md ->" in out
     assert "Observação encerrada." in out
     assert (saida / "minuta_SEI.html").is_file()
-
-
-def test_cli_troca_de_unico_para_partes_limpa_saida_antiga(tmp_path):
-    """O sentido inverso: --partes num documento curto remove o arquivo único anterior."""
-    entrada = tmp_path / "doc.md"
-    entrada.write_text("# 1. ASSUNTO\n\n1.1. Texto.", encoding="utf-8")
-
-    main([str(entrada), "-o", str(tmp_path)])
-    assert (tmp_path / "doc_SEI.html").is_file()
-
-    main([str(entrada), "-o", str(tmp_path), "--partes"])
-    assert (tmp_path / "doc_SEI_parte01.html").is_file()
-    assert not (tmp_path / "doc_SEI.html").exists()
 
 
 def test_rtf_em_pasta_vira_falha_com_orientacao_e_nao_some(tmp_path, capsys):

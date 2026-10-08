@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Conversor SEI — DOCX, PDF, ODT, HTML e Markdown para o padrão SEI</title>
-  <meta name="description" content="Conversor de documentos DOCX, PDF, ODT, HTML e Markdown para o HTML institucional do SEI, com divisão automática em partes. A conversão é feita no navegador, sem enviar o documento." />
+  <meta name="description" content="Conversor de documentos DOCX, PDF, ODT, HTML e Markdown para o HTML institucional do SEI, pronto para copiar e colar no editor. A conversão é feita no navegador, sem enviar o documento." />
   
   <!-- Aplicativo instalável: com o service worker, abre e converte sem rede após a primeira visita -->
   <link rel="manifest" href="manifest.webmanifest">
@@ -192,56 +192,6 @@
       </details>
     </div>
 
-    <!-- Painel de Opções Avançadas -->
-    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <button 
-        id="toggle-options-btn" 
-        type="button"
-        aria-expanded="false"
-        aria-controls="options-panel"
-        class="w-full px-5 py-3 text-left font-medium text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors"
-      >
-        <span class="flex items-center text-sm gap-2">
-          <i data-lucide="sliders" class="w-4 h-4 text-slate-500"></i>
-          Opções de conversão
-        </span>
-        <i id="options-chevron" data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-200"></i>
-      </button>
-
-      <div id="options-panel" class="hidden border-t border-slate-200 p-5 bg-slate-50/50 space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <!-- Tamanho Máximo da Parte -->
-          <div class="space-y-1.5">
-            <label for="opt-max-kb" class="block text-sm font-semibold text-slate-700">
-              Tamanho máximo de cada parte (KB)
-            </label>
-            <input 
-              type="number" 
-              id="opt-max-kb" 
-              value="22" 
-              min="5" 
-              max="27"
-              class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
-            <p class="text-sm text-slate-500">Padrão: 22 KB, com folga para o limite de 27 KB do SEI Pro.</p>
-          </div>
-
-          <!-- Forçar Arquivo Único -->
-          <div class="flex items-start space-x-2 pt-1">
-            <input 
-              type="checkbox" 
-              id="opt-forcar-unico" 
-              class="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-            <label for="opt-forcar-unico" class="text-sm text-slate-700 cursor-pointer leading-snug">
-              <strong class="font-medium block text-slate-800">Não dividir em partes</strong>
-              Gera um arquivo só, mesmo acima do limite. O SEI Pro pode perder a formatação ao colar.
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Seção de Resultados (Inicialmente Oculta) -->
     <div id="results-section" class="hidden space-y-4">
       
@@ -255,18 +205,18 @@
             <h3 id="res-filename" class="font-semibold text-slate-900 text-base break-all">documento.docx</h3>
           </div>
           <p id="res-meta" class="text-sm text-slate-500">
-            <span id="res-parts-count" class="font-medium text-slate-700">1 arquivo gerado</span>
+            <span id="res-contagem" class="font-medium text-slate-700">1 arquivo gerado</span>
           </p>
         </div>
 
-        <!-- Botão de Download em Lote no Topo (Visível apenas quando particionado) -->
+        <!-- ZIP com todos os arquivos, visível só quando há mais de um documento -->
         <div id="res-actions-top" class="hidden w-full sm:w-auto flex flex-col sm:flex-row gap-2">
           <button 
             id="btn-download-top" 
             class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-semibold rounded-lg transition-colors"
           >
             <i data-lucide="archive" class="w-4 h-4"></i>
-            <span id="btn-download-top-text">Baixar todas as partes (ZIP)</span>
+            <span>Baixar todos os arquivos (ZIP)</span>
           </button>
         </div>
       </div>
@@ -328,18 +278,18 @@
         </div>
       </details>
 
-      <!-- Lista de Partes Geradas -->
-      <div id="res-parts-list" class="grid grid-cols-1 gap-3">
+      <!-- Arquivos gerados, um por documento -->
+      <div id="res-arquivos" class="grid grid-cols-1 gap-3">
         <!-- Injetado dinamicamente via JS -->
       </div>
 
-      <!-- Guia de colagem no SEI. O passo das partes só aparece quando houve divisão -->
+      <!-- Guia de colagem no SEI -->
       <div class="bg-white border border-slate-200 rounded-xl p-5 text-slate-600 text-sm space-y-3">
         <h3 class="font-semibold text-slate-800 flex items-center gap-1.5 text-sm">
           <i data-lucide="help-circle" class="w-4 h-4 text-slate-500"></i>
           Como colar no editor do SEI
         </h3>
-        <div id="guia-passos" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-600">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-600">
           <div class="border-l-2 border-slate-200 pl-3">
             <span class="font-semibold text-slate-800 block mb-1">1. Copiar</span>
             Clique em <strong>Copiar para o SEI</strong> no arquivo convertido.
@@ -347,10 +297,6 @@
           <div class="border-l-2 border-slate-200 pl-3">
             <span class="font-semibold text-slate-800 block mb-1">2. Colar no SEI</span>
             No editor do SEI, clique na área de texto e pressione <kbd class="bg-slate-100 px-1 py-0.5 border rounded">Ctrl+V</kbd> (<kbd class="bg-slate-100 px-1 py-0.5 border rounded">Cmd+V</kbd> no Mac).
-          </div>
-          <div id="guia-partes" class="hidden border-l-2 border-slate-200 pl-3">
-            <span class="font-semibold text-slate-800 block mb-1">3. Colar as partes em ordem</span>
-            Cole a <strong>Parte 1</strong>. Com o cursor no fim do texto, copie e cole a <strong>Parte 2</strong>, e assim por diante.
           </div>
         </div>
       </div>
@@ -403,7 +349,7 @@
         <!-- novidades:inicio -->
         <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Em desenvolvimento <span class="font-normal text-slate-500">já na página</span></h4>
-          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Rodapé.</strong> A versão passa a ocupar uma linha própria, e o rodapé deixa de quebrar o texto e os botões em telas médias.</li><li><strong>Assinatura colada de um chat.</strong> A assinatura escrita num parágrafo só, com a marca, o nome e o cargo em linhas quebradas, passa a sair como bloco de assinatura, uma linha por parágrafo.</li><li><strong>Privacidade explicada na página.</strong> Abaixo da área de envio, o quadro "Seus documentos não saem do seu computador" explica que o documento não é enviado a servidores nem a serviços de inteligência artificial, que nada fica guardado e como conferir isso desligando a internet.</li></ul>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Documento inteiro num arquivo só.</strong> O documento longo deixa de ser dividido em partes: a cópia e a colagem direto no editor do SEI levam o documento inteiro com a formatação. A divisão servia ao limite do plugin SEI Pro. Saem também o painel "Opções de conversão", o tamanho do arquivo e o aviso de limite. Na linha de comando, saem `--unico`, `--partes` e `--max-kb`, e as partes de conversões anteriores são apagadas da pasta de saída.</li><li><strong>Rodapé.</strong> A versão passa a ocupar uma linha própria, e o rodapé deixa de quebrar o texto e os botões em telas médias.</li><li><strong>Assinatura colada de um chat.</strong> A assinatura escrita num parágrafo só, com a marca, o nome e o cargo em linhas quebradas, passa a sair como bloco de assinatura, uma linha por parágrafo.</li><li><strong>Privacidade explicada na página.</strong> Abaixo da área de envio, o quadro "Seus documentos não saem do seu computador" explica que o documento não é enviado a servidores nem a serviços de inteligência artificial, que nada fica guardado e como conferir isso desligando a internet.</li></ul>
         </section>
         <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Versão 0.5.0 <span class="font-normal text-slate-500">7 de outubro de 2026</span></h4>
@@ -512,7 +458,7 @@
   </footer>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=3eed7264c1"></script>
+  <script src="app.js?v=bc18539099"></script>
 
   <!-- Contagem de acessos, sem cookies. Fica fora do service worker: sem rede, a visita
        apenas não é contada, e a página continua abrindo -->

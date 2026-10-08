@@ -46,10 +46,10 @@ def documentos() -> list[Path]:
 def saida_do_documento(arquivo: Path) -> str:
     """Corpo convertido, num arquivo só, com os avisos no topo como comentários.
 
-    Só o corpo e sem divisão em partes: o CSS e o ponto de corte mudam por outros motivos,
-    e fariam todo o corpus falhar a cada ajuste de estilo ou de tamanho.
+    Só o corpo: o CSS muda por outros motivos e faria todo o corpus falhar a cada ajuste
+    de estilo.
     """
-    res = converter_bytes(arquivo.name, arquivo.read_bytes(), so_corpo=True, forcar_unico=True)
+    res = converter_bytes(arquivo.name, arquivo.read_bytes(), so_corpo=True)
     if not res.sucesso:
         return "".join(f"<!-- erro: {erro} -->\n" for erro in res.erros)
     avisos = "".join(f"<!-- aviso: {aviso} -->\n" for aviso in res.avisos)

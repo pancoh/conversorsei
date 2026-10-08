@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from conversorsei.core import converter_bytes
-from conversorsei.particionador import BYTES_POR_KB, LIMITE_SEI_BYTES, MAX_KB_PADRAO
 
 
 def nome_seguro(nome_arquivo: str) -> str:
@@ -29,9 +28,6 @@ def converter_documento_memoria(
     nome_arquivo: str,
     conteudo_bytes: bytes,
     so_corpo: bool = False,
-    forcar_unico: bool = False,
-    forcar_partes: bool = False,
-    max_kb: int = MAX_KB_PADRAO,
     max_nivel: int = 4,
     validar: bool = True,
     citacao_por_recuo: bool = False,
@@ -44,9 +40,6 @@ def converter_documento_memoria(
         nome_arquivo=nome_seguro(nome_arquivo),
         conteudo=conteudo_bytes,
         so_corpo=so_corpo,
-        forcar_unico=forcar_unico,
-        forcar_partes=forcar_partes,
-        max_kb=max_kb,
         max_nivel=max_nivel,
         validar=validar,
         citacao_por_recuo=citacao_por_recuo,
@@ -55,18 +48,7 @@ def converter_documento_memoria(
         colado=colado,
     )
 
-    arquivos = [
-        {
-            "nome": arquivo.nome,
-            "conteudo": arquivo.conteudo,
-            "tamanho_bytes": arquivo.tamanho_bytes,
-            "tamanho_kb": round(arquivo.tamanho_bytes / BYTES_POR_KB, 2),
-            # A interface diz se o arquivo cabe numa colagem: o número sozinho não diz
-            # se 21 KB é pouco ou muito, e com "forçar arquivo único" ele pode passar
-            "cabe_no_limite": arquivo.tamanho_bytes <= LIMITE_SEI_BYTES,
-        }
-        for arquivo in resultado.arquivos
-    ]
+    arquivos = [{"nome": arquivo.nome, "conteudo": arquivo.conteudo} for arquivo in resultado.arquivos]
 
     return {
         "sucesso": resultado.sucesso,
@@ -77,8 +59,6 @@ def converter_documento_memoria(
         "erros": resultado.erros,
         "avisos": resultado.avisos,
         "arquivos": arquivos,
-        "total_partes": len(arquivos),
-        "limite_kb": LIMITE_SEI_BYTES // BYTES_POR_KB,
         # Com a opção desligada, a interface usa a contagem para oferecer a troca. As duas
         # formas vêm separadas para a interface dizer por que sugere a citação
         "citacoes_por_recuo": resultado.citacoes_por_recuo,
@@ -95,9 +75,6 @@ def converter_memoria_json(
     nome_arquivo: str,
     conteudo_bytes: bytes,
     so_corpo: bool = False,
-    forcar_unico: bool = False,
-    forcar_partes: bool = False,
-    max_kb: int = MAX_KB_PADRAO,
     max_nivel: int = 4,
     validar: bool = True,
     citacao_por_recuo: bool = False,
@@ -110,9 +87,6 @@ def converter_memoria_json(
         nome_arquivo=nome_arquivo,
         conteudo_bytes=conteudo_bytes,
         so_corpo=so_corpo,
-        forcar_unico=forcar_unico,
-        forcar_partes=forcar_partes,
-        max_kb=max_kb,
         max_nivel=max_nivel,
         validar=validar,
         citacao_por_recuo=citacao_por_recuo,

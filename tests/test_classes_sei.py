@@ -203,7 +203,7 @@ def test_documento_de_referencia_usa_todas_as_classes_do_sei():
 
     assert resultado["sucesso"], resultado["erros"]
     assert resultado["avisos"] == []
-    assert resultado["total_partes"] == 1
+    assert len(resultado["arquivos"]) == 1
     corpo = resultado["arquivos"][0]["conteudo"]
     obtido = classes_por_texto(corpo)
 
@@ -254,7 +254,7 @@ def test_titulo_numerado_do_markdown_continua_item():
 def test_validador_aponta_marcacao_markdown_que_sobrou(trecho, aviso):
     from conversorsei.validador import validar_html_sei
 
-    assert any(aviso in falha for falha in validar_html_sei(trecho, validar_tamanho=False))
+    assert any(aviso in falha for falha in validar_html_sei(trecho))
 
 
 def test_texto_extraido_com_til_nao_vira_riscado():

@@ -16,7 +16,7 @@ import re
 
 import pytest
 
-from conversorsei.particionador import avancar_contadores, formatar_counter_reset, montar_html
+from conversorsei.montagem import COUNTER_RESET_INICIAL, montar_html
 
 sync_api = pytest.importorskip("playwright.sync_api")
 
@@ -49,7 +49,7 @@ RE_REGRA_CSS = re.compile(r"([^{}]+)\{([^{}]*)\}")
 RE_COUNTER_RESET = re.compile(r"counter-reset:[^;}]*;?")
 
 
-def referencia(html: str, contadores: dict[str, int] | None) -> str:
+def referencia(html: str) -> str:
     """A mesma página, com os contadores iniciais num div vazio no começo do body.
 
     Tira o counter-reset de toda regra que não seja de parágrafo: no CSS do SEI, só as
@@ -65,7 +65,7 @@ def referencia(html: str, contadores: dict[str, int] | None) -> str:
 
     inicio, fim = html.index("<style>"), html.index("</style>")
     estilo = RE_REGRA_CSS.sub(sem_reset_fora_de_paragrafo, html[inicio:fim])
-    div = f'<div style="counter-reset:{formatar_counter_reset(contadores)}"></div>'
+    div = f'<div style="counter-reset:{COUNTER_RESET_INICIAL}"></div>'
     return html[:inicio] + estilo + html[fim:].replace("<body>", f"<body>\n{div}", 1)
 
 
@@ -82,14 +82,9 @@ def captura(pagina, html: str) -> bytes:
     return pagina.screenshot(full_page=True)
 
 
-@pytest.mark.parametrize(
-    "contadores",
-    [None, avancar_contadores({}, CORPO)],
-    ids=["primeira parte", "parte que continua a numeração"],
-)
-def test_numeracao_exibida_igual_a_da_referencia(pagina, contadores):
-    gerada = montar_html(CORPO, contadores=contadores)
-    assert captura(pagina, gerada) == captura(pagina, referencia(gerada, contadores)), (
+def test_numeracao_exibida_igual_a_da_referencia(pagina):
+    gerada = montar_html(CORPO)
+    assert captura(pagina, gerada) == captura(pagina, referencia(gerada)), (
         "A numeração exibida diverge da referência. Os contadores iniciais precisam nascer "
         "num irmão dos parágrafos (body::before), e não no body ou no html."
     )

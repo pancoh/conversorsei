@@ -18,7 +18,6 @@ from conversorsei.core import (
     converter_documento,
     entra_na_varredura,
 )
-from conversorsei.particionador import MAX_KB_PADRAO
 
 INTERVALO_WATCH_PADRAO = 2.0
 
@@ -140,9 +139,6 @@ def observar(args: argparse.Namespace, alvos: list[str], outdir: Path | None, va
                     caminho_entrada=caminho,
                     outdir=outdir,
                     so_corpo=args.corpo,
-                    forcar_unico=args.unico,
-                    forcar_partes=args.partes,
-                    max_kb=args.max_kb,
                     max_nivel=args.max_nivel,
                     validar=validar,
                     citacao_por_recuo=args.citacao_por_recuo,
@@ -179,9 +175,8 @@ def criar_parser() -> argparse.ArgumentParser:
 Exemplos de uso:
   conversorsei documento.docx
   conversorsei minuta.md -o ./saida_sei/
-  conversorsei processo.pdf --max-kb=18
   conversorsei ./pasta_de_documentos/ -r -o ./saida/
-  conversorsei doc.docx --corpo  # para o plugin 'inserir HTML' do SEI Pro
+  conversorsei doc.docx --corpo  # só os parágrafos, sem <head> nem <style>
   conversorsei -w                # observa dados/entrada/ e converte a cada alteração
 """,
     )
@@ -206,25 +201,9 @@ Exemplos de uso:
         help="Nome explícito do arquivo de saída (aplicável quando houver apenas um arquivo de entrada).",
     )
     parser.add_argument(
-        "--unico",
-        action="store_true",
-        help="Força saída em arquivo único, desativando a auto-divisão de partes.",
-    )
-    parser.add_argument(
-        "--partes",
-        action="store_true",
-        help="Força a nomenclatura _parte01.html mesmo quando couber em uma única parte.",
-    )
-    parser.add_argument(
-        "--max-kb",
-        type=int,
-        default=MAX_KB_PADRAO,
-        help=f"Tamanho máximo aproximado em KB para cada parte (padrão: {MAX_KB_PADRAO} KB; SEI Pro perde estilo >27 KB).",
-    )
-    parser.add_argument(
         "--corpo",
         action="store_true",
-        help="Gera apenas o fragmento HTML do corpo (sem <head>/<style>), ideal para plugin SEI Pro.",
+        help="Gera apenas o fragmento HTML do corpo (sem <head>/<style>).",
     )
     parser.add_argument(
         "--max-nivel",
@@ -254,7 +233,7 @@ Exemplos de uso:
     parser.add_argument(
         "--no-validar",
         action="store_true",
-        help="Desativa validação de regras institucionais e limites de tamanho.",
+        help="Desativa a validação das regras institucionais.",
     )
     parser.add_argument(
         "-w",
@@ -313,9 +292,6 @@ def main(argv: list[str] | None = None) -> int:
             caminho_entrada=alvos[0],
             caminho_saida=args.saida,
             so_corpo=args.corpo,
-            forcar_unico=args.unico,
-            forcar_partes=args.partes,
-            max_kb=args.max_kb,
             max_nivel=args.max_nivel,
             validar=validar,
             citacao_por_recuo=args.citacao_por_recuo,
@@ -336,9 +312,6 @@ def main(argv: list[str] | None = None) -> int:
                     outdir=outdir,
                     recursivo=args.recursivo,
                     so_corpo=args.corpo,
-                    forcar_unico=args.unico,
-                    forcar_partes=args.partes,
-                    max_kb=args.max_kb,
                     max_nivel=args.max_nivel,
                     validar=validar,
                     citacao_por_recuo=args.citacao_por_recuo,
@@ -358,9 +331,6 @@ def main(argv: list[str] | None = None) -> int:
                     caminho_entrada=p_alvo,
                     outdir=outdir,
                     so_corpo=args.corpo,
-                    forcar_unico=args.unico,
-                    forcar_partes=args.partes,
-                    max_kb=args.max_kb,
                     max_nivel=args.max_nivel,
                     validar=validar,
                     citacao_por_recuo=args.citacao_por_recuo,
@@ -398,12 +368,7 @@ def main(argv: list[str] | None = None) -> int:
     for r in resultados:
         if r.sucesso:
             sucessos += 1
-            if len(r.arquivos_gerados) == 1:
-                print(f"OK   {r.arquivo_origem.name} -> {r.arquivos_gerados[0]}")
-            else:
-                print(f"OK   {r.arquivo_origem.name} -> dividido em {len(r.arquivos_gerados)} partes (~{args.max_kb} KB):")
-                for g in r.arquivos_gerados:
-                    print(f"       {g.name}")
+            print(f"OK   {r.arquivo_origem.name} -> {r.arquivos_gerados[0]}")
             for aviso in r.avisos:
                 print(f"     aviso: {aviso}")
             citacao = aviso_de_citacao(r, args.citacao_por_recuo)

@@ -6,7 +6,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from conversorsei.particionador import LIMITE_SEI_BYTES
 from conversorsei.recursos import obter_estilos_sei
 
 CLASSES_VALIDAS_SEI = {
@@ -97,9 +96,7 @@ def verificar_sequencia_de_niveis(corpo: str, prefixo: str) -> list[str]:
     return falhas
 
 
-def validar_html_sei(
-    html: str, validar_tamanho: bool = True, eh_continuidade: bool = False, origem_markdown: bool = True
-) -> list[str]:
+def validar_html_sei(html: str, origem_markdown: bool = True) -> list[str]:
     """Verifica se o HTML atende estritamente às regras do editor do SEI.
 
     `origem_markdown` falso (entrada .txt, .docx, .odt ou .pdf) desliga o aviso de
@@ -147,30 +144,12 @@ def validar_html_sei(
         falhas.append("O documento contém estrutura que o editor do SEI não aceita. Confira a prévia antes de colar.")
 
     # 5. Numeração automática
-    if not eh_continuidade:
-        for prefixo in ("Item_Nivel", "Paragrafo_Numerado_Nivel"):
-            falhas.extend(verificar_sequencia_de_niveis(b, prefixo))
+    for prefixo in ("Item_Nivel", "Paragrafo_Numerado_Nivel"):
+        falhas.extend(verificar_sequencia_de_niveis(b, prefixo))
 
     # 6. Itens de lista sem classe institucional
     if re.search(r"<li(?![^>]*\sclass=)", b, re.IGNORECASE):
         falhas.append("Um item de lista pode perder a formatação no SEI. Confira a lista após colar.")
-
-    # 7. Limite de tamanho por parte para plugin SEI Pro
-    if validar_tamanho:
-        tamanho = len(html.encode("utf-8"))
-        if tamanho > LIMITE_SEI_BYTES:
-            tamanho_br = f"{tamanho:,}".replace(",", ".")
-            limite_br = f"{LIMITE_SEI_BYTES:,}".replace(",", ".")
-            # A orientação depende da causa: só uma imagem impede a divisão automática
-            acao = (
-                "Confira o aviso de imagem grande."
-                if "<img " in b
-                else "Diminua o tamanho máximo por parte ou divida no original o trecho mais longo, como uma tabela."
-            )
-            falhas.append(
-                f"Esta parte tem {tamanho_br} bytes (o limite seguro é {limite_br}). "
-                f"A formatação pode se perder ao colar no SEI Pro. {acao}"
-            )
 
     return falhas
 
@@ -181,4 +160,4 @@ def validar_arquivo_sei(caminho: str | Path) -> list[str]:
     if not p.is_file():
         return [f"Arquivo não encontrado: {caminho}"]
     conteudo = p.read_text(encoding="utf-8", errors="replace")
-    return validar_html_sei(conteudo, validar_tamanho=True)
+    return validar_html_sei(conteudo)

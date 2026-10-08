@@ -5,6 +5,11 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+- **Documento inteiro num arquivo só.** O documento longo deixa de ser dividido em partes:
+  a cópia e a colagem direto no editor do SEI levam o documento inteiro com a formatação.
+  A divisão servia ao limite do plugin SEI Pro. Saem também o painel "Opções de conversão",
+  o tamanho do arquivo e o aviso de limite. Na linha de comando, saem `--unico`, `--partes`
+  e `--max-kb`, e as partes de conversões anteriores são apagadas da pasta de saída.
 - **Rodapé.** A versão passa a ocupar uma linha própria, e o rodapé deixa de quebrar o texto
   e os botões em telas médias.
 - **Assinatura colada de um chat.** A assinatura escrita num parágrafo só, com a marca, o

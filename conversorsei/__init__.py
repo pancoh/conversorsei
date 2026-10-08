@@ -1,6 +1,6 @@
 """
 conversorsei — Pacote Python para conversão universal de documentos (DOCX, PDF, ODT, HTML, MD, TXT)
-para o padrão institucional do editor SEI (CKEditor / SEI Pro).
+para o padrão institucional do editor do SEI.
 """
 from conversorsei.core import (
     EXTENSOES_SUPORTADAS,
@@ -25,17 +25,15 @@ from conversorsei.md_converter import (
     converter_texto_md_para_blocos,
     markdown_para_docx,
 )
+from conversorsei.montagem import (
+    css_institucional,
+    derivar_caminho_saida,
+    montar_html,
+)
 from conversorsei.odt_converter import (
     converter_odt_para_blocos,
     converter_odt_para_html,
     extrair_markdown_odt,
-)
-from conversorsei.particionador import (
-    css_institucional,
-    derivar_caminho_saida,
-    dividir_em_partes,
-    montar_html,
-    orcamento_corpo,
 )
 from conversorsei.pdf_converter import (
     converter_pdf_para_blocos,
@@ -69,14 +67,12 @@ __all__ = [
     "converter_texto_md_para_blocos",
     "css_institucional",
     "derivar_caminho_saida",
-    "dividir_em_partes",
     "extrair_markdown_html",
     "extrair_markdown_odt",
     "extrair_texto_pdf",
     "limpar_boilerplate_sei",
     "markdown_para_docx",
     "montar_html",
-    "orcamento_corpo",
     "validar_arquivo_sei",
     "validar_html_sei",
 ]

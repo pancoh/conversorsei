@@ -56,11 +56,11 @@ def test_validar_html_detecta_salto_de_nivel():
 
 def test_validar_html_detecta_li_sem_classe():
     html = "<ul><li>Item sem classe institucional</li></ul>"
-    falhas = validar_html_sei(html, validar_tamanho=False)
+    falhas = validar_html_sei(html)
     assert any("item de lista pode perder" in f for f in falhas)
 
     html_ok = '<ul><li class="Texto_Justificado">Item com classe</li></ul>'
-    assert validar_html_sei(html_ok, validar_tamanho=False) == []
+    assert validar_html_sei(html_ok) == []
 
 
 def test_paragrafo_numerado_orfao_e_apontado():
@@ -69,7 +69,7 @@ def test_paragrafo_numerado_orfao_e_apontado():
         '<p class="Paragrafo_Numerado_Nivel2">Texto do parágrafo.</p>\n'
         '<p class="Paragrafo_Numerado_Nivel2">Outro parágrafo.</p>'
     )
-    falhas = validar_html_sei(html, validar_tamanho=False)
+    falhas = validar_html_sei(html)
     assert any("falta um item do nível 1" in f for f in falhas)
 
 
@@ -79,7 +79,7 @@ def test_paragrafo_numerado_em_sequencia_passa():
         '<p class="Paragrafo_Numerado_Nivel2">Subparágrafo.</p>\n'
         '<p class="Paragrafo_Numerado_Nivel1">Segundo parágrafo.</p>'
     )
-    assert validar_html_sei(html, validar_tamanho=False) == []
+    assert validar_html_sei(html) == []
 
 
 def test_salto_de_nivel_em_paragrafo_numerado():
@@ -87,7 +87,7 @@ def test_salto_de_nivel_em_paragrafo_numerado():
         '<p class="Paragrafo_Numerado_Nivel1">Primeiro parágrafo.</p>\n'
         '<p class="Paragrafo_Numerado_Nivel3">Salto direto para o nível 3.</p>'
     )
-    falhas = validar_html_sei(html, validar_tamanho=False)
+    falhas = validar_html_sei(html)
     assert any("salta do nível 1 para o 3" in f for f in falhas)
 
 
@@ -96,15 +96,12 @@ def test_mensagem_de_nivel_diz_qual_numeracao_conferir():
         '<p class="Item_Nivel2">Título órfão.</p>\n'
         '<p class="Paragrafo_Numerado_Nivel2">Parágrafo órfão.</p>'
     )
-    falhas = validar_html_sei(html, validar_tamanho=False)
+    falhas = validar_html_sei(html)
     assert any(f.startswith("A numeração dos títulos e itens começa") for f in falhas)
     assert any(f.startswith("A numeração dos parágrafos numerados começa") for f in falhas)
 
 
-def test_aviso_de_tamanho_so_cita_imagem_quando_ha_imagem():
+def test_documento_grande_nao_recebe_aviso_de_tamanho():
+    """O limite de tamanho era o do plugin SEI Pro: a colagem direta leva o documento inteiro."""
     texto = '<p class="Texto_Justificado">' + "a" * 30000 + "</p>"
-    sem_imagem = validar_html_sei(texto)
-    assert any("limite seguro" in f and "imagem" not in f for f in sem_imagem)
-
-    com_imagem = validar_html_sei('<p class="Texto_Justificado"><img src="data:image/png;base64,' + "A" * 30000 + '" /></p>')
-    assert any("aviso de imagem grande" in f for f in com_imagem)
+    assert validar_html_sei(texto) == []

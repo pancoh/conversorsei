@@ -2,8 +2,6 @@ import json
 
 import pytest
 
-from conversorsei.core import avisos_de_blocos_grandes
-from conversorsei.particionador import BYTES_POR_KB, LIMITE_SEI_BYTES
 from conversorsei.web import converter_documento_memoria, converter_memoria_json
 
 
@@ -14,10 +12,8 @@ def test_converter_documento_memoria_md():
     res = converter_documento_memoria(
         nome_arquivo="minuta.md",
         conteudo_bytes=md_bytes,
-        max_kb=22,
     )
     assert res["sucesso"] is True
-    assert res["total_partes"] == 1
     assert len(res["arquivos"]) == 1
     assert res["arquivos"][0]["nome"] == "minuta_SEI.html"
     assert "Item_Nivel1" in res["arquivos"][0]["conteudo"]
@@ -108,29 +104,19 @@ def test_markdown_subitem_mantem_recuo_e_hierarquia():
     assert "Subitem interno" in html and "Segundo subitem" in html
 
 
-def test_imagem_grande_recebe_acao_possivel():
-    bloco = '<p class="Texto_Justificado"><img src="data:image/png;base64,' + "A" * 30000 + '" /></p>'
-    avisos = avisos_de_blocos_grandes([bloco], max_kb=22, so_corpo=False, forcar_unico=False)
-    assert "Reduza a imagem" in avisos[0]
+def test_resultado_nao_traz_tamanho_nem_limite_de_colagem():
+    """O documento grande sai num arquivo só, sem tamanho nem limite para a interface mostrar.
 
-
-def test_resultado_diz_se_cada_arquivo_cabe_no_limite_do_sei_pro():
-    """A interface mostra se o arquivo cabe numa colagem, e não só o tamanho.
-
-    Com "forçar arquivo único", um documento grande passa do limite: é o caso em que o
-    aviso importa.
+    O limite era o do plugin SEI Pro. Sem ele, o tamanho não diz nada a quem cola.
     """
-    paragrafo = "Texto do parágrafo que se repete para passar do limite do SEI Pro. " * 5
+    paragrafo = "Texto do parágrafo que se repete para formar um documento longo. " * 5
     grande = "\n\n".join(f"{i}. {paragrafo}" for i in range(1, 200)).encode("utf-8")
 
-    unico = converter_documento_memoria("grande.txt", grande, forcar_unico=True)
-    assert unico["limite_kb"] == LIMITE_SEI_BYTES // BYTES_POR_KB
-    assert unico["arquivos"][0]["tamanho_bytes"] > LIMITE_SEI_BYTES
-    assert unico["arquivos"][0]["cabe_no_limite"] is False
-
-    partes = converter_documento_memoria("grande.txt", grande)
-    assert len(partes["arquivos"]) > 1
-    assert all(arq["cabe_no_limite"] for arq in partes["arquivos"])
+    res = converter_documento_memoria("grande.txt", grande)
+    assert [arq["nome"] for arq in res["arquivos"]] == ["grande_SEI.html"]
+    assert set(res["arquivos"][0]) == {"nome", "conteudo"}
+    assert "limite_kb" not in res and "total_partes" not in res
+    assert not any("bytes" in aviso for aviso in res["avisos"])
 
 
 def test_converter_documento_memoria_ignora_diretorios_no_nome():
@@ -202,8 +188,8 @@ def test_web_e_cli_geram_o_mesmo_html(tmp_path, nome, conteudo):
         assert gerado.read_text(encoding="utf-8") == em_memoria["conteudo"]
 
 
-def test_web_particiona_e_continua_a_numeracao_como_a_cli(tmp_path):
-    """Documento grande: as partes em memória precisam seguir a mesma numeração."""
+def test_web_e_cli_geram_o_mesmo_arquivo_para_documento_longo(tmp_path):
+    """Documento longo: a conversão em memória e a em disco entregam o mesmo arquivo único."""
     from conversorsei.core import converter_documento
 
     linhas = []
@@ -217,11 +203,10 @@ def test_web_particiona_e_continua_a_numeracao_como_a_cli(tmp_path):
     res_disco = converter_documento(entrada, outdir=tmp_path / "saida")
     res_memoria = converter_documento_memoria(nome_arquivo="grande.md", conteudo_bytes=conteudo)
 
-    assert len(res_disco.arquivos_gerados) > 1
-    assert res_memoria["total_partes"] == len(res_disco.arquivos_gerados)
-    for gerado, em_memoria in zip(res_disco.arquivos_gerados, res_memoria["arquivos"], strict=True):
-        assert gerado.name == em_memoria["nome"]
-        assert gerado.read_text(encoding="utf-8") == em_memoria["conteudo"]
+    [gerado] = res_disco.arquivos_gerados
+    [em_memoria] = res_memoria["arquivos"]
+    assert gerado.name == em_memoria["nome"]
+    assert gerado.read_text(encoding="utf-8") == em_memoria["conteudo"]
 
 
 def _origem_binaria(tmp_path, extensao):

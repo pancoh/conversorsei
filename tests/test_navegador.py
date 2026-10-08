@@ -219,18 +219,20 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     assert "3 parágrafos vêm antes do item 1" in cartao.inner_text()
 
     # O resumo da conversão fica só para o leitor de tela (o quadro do resultado já diz o
-    # mesmo), o limite só aparece quando o arquivo não cabe, e Copiar é o único botão
+    # mesmo), o arquivo sai inteiro, sem tamanho nem limite, e Copiar é o único botão
     # principal da tela
     assert pagina.locator("#pyodide-status-card").evaluate("el => el.classList.contains('sr-only')")
-    assert "Cabe no limite" not in pagina.locator("#res-parts-list").inner_text()
+    assert pagina.locator("#res-arquivos [data-arquivo]").count() == 1
+    assert "KB" not in pagina.locator("#res-arquivos").inner_text()
+    assert pagina.locator("#options-panel").count() == 0
     assert "bg-white" in (pagina.locator("#btn-selecionar").get_attribute("class") or "")
 
-    marca = pagina.locator("[data-parte='0'] [data-marca-copiada]")
+    marca = pagina.locator("[data-arquivo='0'] [data-marca-copiada]")
     assert marca.is_hidden()
     copiado = _copiar(pagina)
     assert "NOTA TÉCNICA" in copiado
     assert 'class="Item_Nivel1"' in copiado
-    # A marca de parte copiada fica depois que o "Copiado" do botão some
+    # A marca de arquivo copiado fica depois que o "Copiado" do botão some
     assert marca.is_visible()
 
     # Omitir cabeçalho converte de novo, e o HTML copiado começa no item 1
@@ -301,7 +303,7 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
         "#file-input",
         files=[{"name": "pagina.html", "mimeType": "text/html", "buffer": PAGINA_HTML}],
     )
-    pagina.locator("#res-parts-list", has_text="pagina_SEI.html").wait_for(timeout=PRAZO_CONVERSAO_MS)
+    pagina.locator("#res-arquivos", has_text="pagina_SEI.html").wait_for(timeout=PRAZO_CONVERSAO_MS)
     copiado = _copiar(pagina)
     assert 'class="Texto_Ementa"' in copiado and "Ementa lida de HTML." in copiado
     assert "alert" not in copiado
@@ -446,7 +448,7 @@ def test_texto_colado_converte_como_um_arquivo(contexto: object, endereco: str) 
                   "text/plain": "Ementa colada.\nTexto."}],
     )
     pagina.locator("#res-filename", has_text="Texto colado").wait_for(timeout=PRAZO_CONVERSAO_MS)
-    assert "texto_colado_SEI.html" in pagina.locator("#res-parts-list").inner_text()
+    assert "texto_colado_SEI.html" in pagina.locator("#res-arquivos").inner_text()
     copiado = _copiar(pagina)
     assert 'class="Texto_Ementa"' in copiado and "Ementa colada." in copiado
     assert "Formato: colado (.html)" in unquote(pagina.evaluate("() => linkDoRelato()"))
@@ -464,9 +466,10 @@ def test_texto_colado_converte_como_um_arquivo(contexto: object, endereco: str) 
     _resultado_com(pagina, 'class="Item_Nivel1"')
     _resultado_com(pagina, "<strong>negrito</strong>")
 
-    # Colar num campo das opções é só colar: não converte
+    # Colar num campo de texto qualquer é só colar: não converte
     selecao = pagina.evaluate("() => numeroDaSelecao")
-    pagina.evaluate(COLAR, ["#opt-max-kb", {"text/plain": "20"}])
+    pagina.evaluate("() => { const c = document.createElement('input'); c.id = 'campo-qualquer'; document.body.append(c); }")
+    pagina.evaluate(COLAR, ["#campo-qualquer", {"text/plain": "20"}])
     assert pagina.evaluate("() => numeroDaSelecao") == selecao
 
     # Sem a leitura liberada, o botão abre o campo, e colar nele converte e o fecha
@@ -596,12 +599,9 @@ def test_ocr_reconhece_o_texto_de_um_pdf_digitalizado(contexto: object, endereco
     assert link.get_attribute("href") == "https://tools.pdf24.org/pt/ocr-pdf"
     assert link.get_attribute("rel") == "noopener noreferrer"
 
-    # O campo fica no painel de opções, fechado: muda o valor como a pessoa faria ao sair dele
-    pagina.evaluate(
-        "() => { const c = document.getElementById('opt-max-kb'); c.value = '20';"
-        " c.dispatchEvent(new Event('change')); }"
-    )
-    pagina.locator("#toast-message", has_text="Convertido de novo").wait_for(timeout=PRAZO_CONVERSAO_MS)
+    # Converter de novo o mesmo arquivo (como fazem os botões de citação e de cabeçalho)
+    # usa o texto já reconhecido, sem refazer o OCR
+    assert pagina.evaluate("() => processFiles(ultimosArquivos)")
     assert "padronizacao dos relatorios mensais" in pagina.evaluate("() => currentResultFiles[0].conteudo")
 
     assert erros == []

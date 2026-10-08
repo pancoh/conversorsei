@@ -50,20 +50,12 @@ const colarPainel = document.getElementById('colar-painel');
 const colarCampo = document.getElementById('colar-campo');
 const btnColarConverter = document.getElementById('btn-colar-converter');
 
-const toggleOptionsBtn = document.getElementById('toggle-options-btn');
-const optionsPanel = document.getElementById('options-panel');
-const optionsChevron = document.getElementById('options-chevron');
-
-const optMaxKb = document.getElementById('opt-max-kb');
-const optForcarUnico = document.getElementById('opt-forcar-unico');
-
 const resultsSection = document.getElementById('results-section');
 const resFilename = document.getElementById('res-filename');
 const resMeta = document.getElementById('res-meta');
-const resPartsCount = document.getElementById('res-parts-count');
+const resContagem = document.getElementById('res-contagem');
 const resActionsTop = document.getElementById('res-actions-top');
 const btnDownloadTop = document.getElementById('btn-download-top');
-const btnDownloadTopText = document.getElementById('btn-download-top-text');
 const resWarningsCard = document.getElementById('res-warnings-card');
 const resWarningsList = document.getElementById('res-warnings-list');
 const resAjustes = document.getElementById('res-ajustes');
@@ -77,9 +69,7 @@ const resCabecalhoTexto = document.getElementById('res-cabecalho-texto');
 const resCabecalhoTrechos = document.getElementById('res-cabecalho-trechos');
 const resCabecalhoResumo = document.getElementById('res-cabecalho-resumo');
 const btnCabecalho = document.getElementById('btn-cabecalho');
-const resPartsList = document.getElementById('res-parts-list');
-const guiaPassos = document.getElementById('guia-passos');
-const guiaPartes = document.getElementById('guia-partes');
+const resArquivos = document.getElementById('res-arquivos');
 
 const previewModal = document.getElementById('preview-modal');
 const previewTitle = document.getElementById('preview-title');
@@ -92,8 +82,7 @@ const toastMessage = document.getElementById('toast-message');
 const toastIcone = document.getElementById('toast-icone');
 const anuncio = document.getElementById('anuncio');
 
-// Números no formato brasileiro. Sem isso, "21.36 KB" (ponto decimal) aparecia ao lado
-// de "20.884" (ponto de milhar), e o primeiro podia ser lido como vinte e um mil
+// Números no formato brasileiro (vírgula decimal e ponto de milhar)
 function formatarNumero(valor, casas = 0) {
   return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
 }
@@ -119,12 +108,12 @@ function refreshIcons() {
 // Os dois rótulos ficam prontos dentro do botão, sobrepostos na mesma célula da grade, e
 // só a visibilidade muda: o botão mantém a largura do rótulo maior, sem medida em px. O
 // nome acessível é fixo (aria-label), e quem fala a confirmação é a região de anúncio,
-// com o rótulo do cartão, para quem usa leitor de tela saber qual parte copiou
+// com o rótulo do cartão, para quem usa leitor de tela saber qual arquivo copiou
 const temporizadoresDaCopia = new WeakMap();
 
-// O "Copiado" do botão dura dois segundos. Num documento em várias partes, a pessoa
-// perdia a conta de quais já tinha colado: a marca no quadro da parte fica até a
-// próxima conversão
+// O "Copiado" do botão dura dois segundos. Com vários documentos, a pessoa perdia a
+// conta de quais já tinha colado: a marca no quadro do arquivo fica até a próxima
+// conversão
 function marcarComoCopiada(card) {
   if (!card) return;
   card.classList.replace('border-slate-200', 'border-emerald-400/60');
@@ -519,14 +508,6 @@ function definirEnvioDisponivel(disponivel) {
   btnSelecionarTexto.textContent = disponivel ? 'Selecionar arquivos' : 'Carregando o conversor...';
 }
 
-// Alternar Painel de Opções
-toggleOptionsBtn.addEventListener('click', () => {
-  const abrir = optionsPanel.classList.contains('hidden');
-  optionsPanel.classList.toggle('hidden', !abrir);
-  optionsChevron.classList.toggle('rotate-180', abrir);
-  toggleOptionsBtn.setAttribute('aria-expanded', String(abrir));
-});
-
 // Eventos de Seleção de Arquivo e Drag & Drop
 fileInput.addEventListener('click', (e) => {
   if (!isPyodideReady) {
@@ -596,8 +577,8 @@ function arquivoDoConteudoColado(dados) {
   return arquivo;
 }
 
-// Ctrl+V em qualquer ponto da página converte o que foi colado. Num campo de texto da
-// página (as opções), colar é colar, menos no campo feito para isso
+// Ctrl+V em qualquer ponto da página converte o que foi colado. Num campo de texto,
+// colar é colar, menos no campo feito para isso
 document.addEventListener('paste', (e) => {
   const alvo = e.target;
   const editavel = alvo instanceof HTMLElement && (alvo.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(alvo.tagName));
@@ -713,23 +694,11 @@ btnCitacao.addEventListener('click', () => {
 });
 
 // Omite ou devolve o cabeçalho e converte de novo os mesmos arquivos. A conversão é
-// refeita, e não só recortada na tela, porque a divisão em partes muda sem o cabeçalho
+// refeita, e não só recortada na tela, para os avisos e a validação valerem para o que sai
 btnCabecalho.addEventListener('click', () => {
   if (ultimosArquivos.length === 0) return;
   omitirCabecalho = !omitirCabecalho;
   processFiles(ultimosArquivos);
-});
-
-// Mudar uma opção com o resultado na tela converte de novo os mesmos arquivos. Sem isso,
-// a opção só valia no próximo envio, e nada na página avisava. O campo numérico dispara
-// 'change' ao sair dele ou com Enter, e não a cada tecla
-[optMaxKb, optForcarUnico].forEach(opcao => {
-  opcao.addEventListener('change', () => {
-    if (ultimosArquivos.length === 0 || !isPyodideReady) return;
-    processFiles(ultimosArquivos).then((convertido) => {
-      if (convertido) showToast('Convertido de novo com as opções novas.');
-    });
-  });
 });
 
 // Converte um ou vários documentos. Com mais de um, os arquivos gerados por todos eles
@@ -740,11 +709,7 @@ async function processFiles(files) {
     return;
   }
   const selecao = ++numeroDaSelecao;
-  const maxKb = Math.min(27, Math.max(5, parseInt(optMaxKb.value, 10) || 22));
-  optMaxKb.value = String(maxKb);
   const opcoes = {
-    maxKb,
-    forcarUnico: optForcarUnico.checked,
     citacaoPorRecuo,
     omitirCabecalho,
   };
@@ -777,7 +742,6 @@ async function processFiles(files) {
   let cabecalhos = 0;
   let documentosComCabecalho = 0;
   const trechosCabecalho = [];
-  let limiteKb = null;
 
   for (let i = 0; i < files.length; i++) {
     if (selecao !== numeroDaSelecao) return false;
@@ -795,7 +759,6 @@ async function processFiles(files) {
       // sobrescreveria o outro dentro do ZIP
       const origem = resultado.nome_origem || file.name;
       resultado.arquivos.forEach(arq => gerados.push({ ...arq, origem }));
-      limiteKb = resultado.limite_kb ?? limiteKb;
       (resultado.avisos || []).forEach(a => avisos.push(`${file.name}: ${a}`));
       if (resultado.citacoes_por_recuo || resultado.citacoes_entre_aspas) {
         citacoes += resultado.citacoes_por_recuo || 0;
@@ -834,7 +797,6 @@ async function processFiles(files) {
       cabecalho_paragrafos: cabecalhos,
       cabecalho_trechos: trechosCabecalho,
       documentos_com_cabecalho: documentosComCabecalho,
-      limite_kb: limiteKb,
     },
     elapsedSeconds
   );
@@ -904,7 +866,7 @@ function mostrarStatusDiscreto(texto) {
 }
 
 // Com o resultado na tela, o resumo da conversão fica só para o leitor de tela: visível,
-// repetia o nome e o número de partes que o quadro do resultado mostra logo abaixo. O
+// repetia o nome e o número de arquivos que o quadro do resultado mostra logo abaixo. O
 // tempo passa para o quadro do resultado
 function mostrarStatusSoParaLeitorDeTela(texto) {
   mostrarStatusDiscreto(texto);
@@ -1153,8 +1115,6 @@ async function converterArquivo(file, opcoes) {
   return executarNoPyodide(async () => {
     pyodideInstance.globals.set('temp_filename', file.name);
     pyodideInstance.globals.set('temp_bytes', bytes);
-    pyodideInstance.globals.set('temp_max_kb', opcoes.maxKb);
-    pyodideInstance.globals.set('temp_forcar_unico', opcoes.forcarUnico);
     // O argumento só vai quando ligado: um pacote ainda em cache, anterior à opção,
     // continua convertendo normalmente
     const argCitacao = opcoes.citacaoPorRecuo ? '\n    citacao_por_recuo=True,' : '';
@@ -1172,8 +1132,6 @@ res_json = conversorsei.web.converter_memoria_json(
     # Sempre o HTML completo: "só o corpo" servia apenas ao Inserir HTML do SEI Pro e saiu
     # da tela. O parâmetro so_corpo continua no pacote e na CLI (--corpo), como reserva
     so_corpo=False,
-    forcar_unico=bool(temp_forcar_unico),
-    max_kb=int(temp_max_kb),
     validar=True,${argCitacao}${argCabecalho}${argOcr}${argColado}
 )
 # Sem isto o documento inteiro fica preso no dicionário global do Python até a
@@ -1234,8 +1192,7 @@ async function processFile(file, selecao, opcoes) {
 
     currentResultFiles = result.arquivos;
     renderResults(result, elapsedSeconds);
-    const partes = result.arquivos.length === 1 ? 'em arquivo único' : `em ${result.arquivos.length} partes`;
-    mostrarStatusSoParaLeitorDeTela(`${nomeNaTela} convertido em ${formatarSegundos(elapsedSeconds)}, ${partes}.`);
+    mostrarStatusSoParaLeitorDeTela(`${nomeNaTela} convertido em ${formatarSegundos(elapsedSeconds)}.`);
   } catch (err) {
     if (selecao !== numeroDaSelecao) return false;
     console.error('Erro na conversão:', err);
@@ -1335,15 +1292,6 @@ function renderCabecalho(total, documentos, trechos) {
   resCabecalhoResumo.classList.remove('hidden');
 }
 
-// Avisa quando o arquivo não cabe numa colagem no SEI Pro. Caber é o normal: repetido
-// em verde em cada parte, o "cabe no limite" virava ruído. Um pacote antigo, ainda no
-// cache, não manda a informação, e o cartão mostra só o tamanho
-function situacaoDoLimite(arq, limiteKb) {
-  if (arq.cabe_no_limite !== false || !limiteKb) return '';
-  return `<span class="inline-flex items-center gap-1 text-amber-700">
-    <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>Acima do limite do SEI Pro (${limiteKb} KB): a formatação pode se perder ao colar</span>`;
-}
-
 // Depois da primeira conversão, o resultado é o que importa: a área de envio encolhe para
 // uma faixa e deixa de empurrar o resultado para baixo. Arrastar continua valendo
 function compactarAreaDeEnvio() {
@@ -1354,17 +1302,6 @@ function compactarAreaDeEnvio() {
   dropZone.classList.add('p-4');
   dropTitulo.textContent = 'Converter outro documento';
   dropTitulo.classList.remove('hidden');
-}
-
-// O passo de colar as partes só aparece quando algum documento foi dividido. No lote,
-// cada documento é uma origem, e é dividido quando gerou mais de um arquivo
-function ajustarGuia(arquivos) {
-  const porOrigem = {};
-  arquivos.forEach(arq => { porOrigem[arq.origem || ''] = (porOrigem[arq.origem || ''] || 0) + 1; });
-  const dividido = Object.values(porOrigem).some(n => n > 1);
-  guiaPartes.classList.toggle('hidden', !dividido);
-  guiaPassos.classList.toggle('md:grid-cols-2', !dividido);
-  guiaPassos.classList.toggle('md:grid-cols-3', dividido);
 }
 
 // Com o resultado na tela, a ação principal é copiar: o botão de enviar outro arquivo
@@ -1394,23 +1331,12 @@ function renderResults(result, segundos) {
   resultsSection.classList.remove('hidden');
   resFilename.textContent = origemColada ? 'Texto colado' : currentOriginalName;
   
-  const totalPartes = result.arquivos.length;
-  if (totalPartes === 1) {
-    resPartsCount.textContent = '1 arquivo gerado';
-  } else {
-    resPartsCount.textContent = emLote ? `${totalPartes} arquivos gerados` : `${totalPartes} partes geradas`;
-  }
-  if (typeof segundos === 'number') resPartsCount.textContent += ` em ${formatarSegundos(segundos)}`;
+  const total = result.arquivos.length;
+  resContagem.textContent = plural(total, 'arquivo gerado', 'arquivos gerados');
+  if (typeof segundos === 'number') resContagem.textContent += ` em ${formatarSegundos(segundos)}`;
 
-  // Exibir botão de download no topo apenas quando for particionado (Download do ZIP com tudo)
-  if (totalPartes > 1) {
-    resActionsTop.classList.remove('hidden');
-    btnDownloadTopText.textContent = emLote ? 'Baixar todos os arquivos (ZIP)' : 'Baixar todas as partes (ZIP)';
-    btnDownloadTop.onclick = downloadAllZip;
-  } else {
-    // Para arquivo único, oculta o botão do topo para não duplicar com os botões do card logo abaixo
-    resActionsTop.classList.add('hidden');
-  }
+  // O ZIP só aparece com vários documentos: com um, duplicaria o Baixar do quadro abaixo
+  resActionsTop.classList.toggle('hidden', total < 2);
 
   // Avisos de validação
   if (result.avisos && result.avisos.length > 0) {
@@ -1429,54 +1355,34 @@ function renderResults(result, segundos) {
     result.citacoes_trechos || []
   );
   resAjustes.classList.toggle('hidden', resCabecalhoCard.classList.contains('hidden') && resCitacaoCard.classList.contains('hidden'));
-  ajustarGuia(result.arquivos);
 
-  // No lote, cada documento pode ter várias partes, e elas saem em sequência. O rótulo
-  // diz a qual documento a parte pertence e qual é a posição dela, para colar na ordem
-  const partesPorOrigem = {};
-  result.arquivos.forEach(arq => {
-    if (arq.origem) partesPorOrigem[arq.origem] = (partesPorOrigem[arq.origem] || 0) + 1;
-  });
-  const posicaoNaOrigem = {};
-
-  // Cards das partes
-  resPartsList.innerHTML = '';
+  // Um quadro por documento
+  resArquivos.innerHTML = '';
   result.arquivos.forEach((arq, index) => {
     const card = document.createElement('div');
     // Informações em cima e botões embaixo: na coluna estreita da página, lado a lado, o
-    // nome, o tamanho e o limite quebravam em três linhas
+    // nome quebrava em várias linhas
     card.className = 'bg-white border border-slate-200 rounded-xl p-4 sm:p-5 flex flex-col gap-3 transition-colors';
-    card.dataset.parte = String(index);
+    card.dataset.arquivo = String(index);
     
     // O rótulo diz o que o arquivo é. O nome do arquivo vai em segundo plano: no
-    // documento único, ele só repetia o nome já exibido no cabeçalho do resultado
-    let rotulo = 'Arquivo pronto para o SEI';
-    if (arq.origem) {
-      posicaoNaOrigem[arq.origem] = (posicaoNaOrigem[arq.origem] || 0) + 1;
-      const total = partesPorOrigem[arq.origem];
-      rotulo = total > 1 ? `${arq.origem}, parte ${posicaoNaOrigem[arq.origem]} de ${total}` : arq.origem;
-    } else if (totalPartes > 1) {
-      rotulo = `Parte ${index + 1} de ${totalPartes}`;
-    }
+    // documento único, ele só repetia o nome já exibido no cabeçalho do resultado. No
+    // lote, o rótulo é o documento de origem
+    const rotulo = arq.origem || 'Arquivo pronto para o SEI';
 
     card.innerHTML = `
       <div class="space-y-1 min-w-0 flex-1">
         <div class="flex items-start justify-between gap-3">
           <p class="font-semibold text-sm text-slate-800 break-all">${escapeHtml(rotulo)}</p>
           <span data-marca-copiada class="hidden shrink-0 items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-400/15 text-xs font-semibold text-emerald-700">
-            <i data-lucide="check" class="w-3.5 h-3.5"></i>Copiada
+            <i data-lucide="check" class="w-3.5 h-3.5"></i>Copiado
           </span>
         </div>
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
-          <span class="break-all">${escapeHtml(arq.nome)}</span>
-          <span>•</span>
-          <span>${formatarNumero(arq.tamanho_kb, 1)} KB</span>
-          ${situacaoDoLimite(arq, result.limite_kb)}
-        </div>
+        <p class="text-sm text-slate-500 break-all">${escapeHtml(arq.nome)}</p>
       </div>
 
       <!-- No celular, Copiar ocupa a linha e os outros dois dividem a de baixo: com três
-           botões empilhados, um documento em três partes virava nove botões na tela -->
+           botões empilhados, um lote de três documentos virava nove botões na tela -->
       <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         <!-- Copiar vem primeiro e em destaque: é o caminho do guia, colar no editor do SEI -->
         <button 
@@ -1510,7 +1416,7 @@ function renderResults(result, segundos) {
       </div>
     `;
 
-    resPartsList.appendChild(card);
+    resArquivos.appendChild(card);
   });
 
   // Conectar eventos dos botões dos cards
@@ -1522,7 +1428,7 @@ function renderResults(result, segundos) {
       const copiado = await copiarHtml(arq.conteudo);
       // Sem o HTML, o botão sai do "Copiado" de uma cópia anterior, para não contradizer o alerta
       mostrarCopiado(botao, copiado === 'html');
-      if (copiado === 'html') marcarComoCopiada(botao.closest('[data-parte]'));
+      if (copiado === 'html') marcarComoCopiada(botao.closest('[data-arquivo]'));
       if (copiado === 'texto') {
         showToast(
           'Este navegador copiou só o texto, sem a formatação: colado no SEI, ele mostraria as tags. '
@@ -1635,6 +1541,8 @@ function copiarPorEventoDeCopia(html) {
 
 // Download em ZIP
 
+btnDownloadTop.addEventListener('click', downloadAllZip);
+
 async function downloadAllZip() {
   if (!currentResultFiles || currentResultFiles.length === 0) return;
 
@@ -1645,8 +1553,7 @@ async function downloadAllZip() {
     zip.file(arq.origem ? `${arq.origem}/${arq.nome}` : arq.nome, arq.conteudo);
   });
 
-  const baseName = currentOriginalName.replace(/\.[^/.]+$/, '');
-  const zipFilename = emLote ? 'conversorsei_lote.zip' : `${baseName}_SEI_partes.zip`;
+  const zipFilename = 'conversorsei_lote.zip';
 
   const blob = await zip.generateAsync({ type: 'blob' });
   triggerBlobDownload(zipFilename, blob);
