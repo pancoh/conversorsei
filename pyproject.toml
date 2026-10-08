@@ -1,6 +1,6 @@
 [project]
 name = "conversorsei"
-version = "0.6.0"
+version = "0.6.1"
 description = "Conversor universal de documentos (DOCX, PDF, MD) para o padrão do editor SEI"
 readme = "README.md"
 license = "MIT"

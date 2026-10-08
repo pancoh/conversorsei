@@ -5,6 +5,8 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+## 0.6.1 (2026-10-08)
+
 - **Imagens do Word no tamanho da página.** A imagem passa a sair com a largura que tem no
   Word, proporcional à página: a foto na largura toda fica com cerca de 800 px no SEI, e a
   altura acompanha. Antes, a foto aparecia no tamanho original, muito maior que a página, e
