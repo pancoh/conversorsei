@@ -5,6 +5,8 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+## 0.6.0 (2026-10-08)
+
 - **Documento inteiro num arquivo só.** O documento longo deixa de ser dividido em partes:
   a cópia e a colagem direto no editor do SEI levam o documento inteiro com a formatação.
   A divisão servia ao limite do plugin SEI Pro. Saem também o painel "Opções de conversão",
