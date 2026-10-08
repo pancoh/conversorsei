@@ -154,7 +154,24 @@ def parece_texto_corrido(texto: str) -> bool:
 
 def _md_links(s: str) -> str:
     """Converte links Markdown literais remanescentes em âncoras HTML."""
-    return RE_MD_LINK.sub(lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>', s)
+    # O inline já contém HTML gerado pelo conversor. Marcação dentro de um href
+    # não é texto Markdown, e um rótulo de link nativo não pode criar outra âncora.
+    etiquetas = [(m.start(), m.end()) for m in re.finditer(r"<[^>]*>", s)]
+    ancoras = [(m.start(), m.end()) for m in re.finditer(r"<a\b[^>]*>.*?</a>", s, re.DOTALL)]
+
+    def ancora(m: re.Match) -> str:
+        if any(inicio <= m.start() < fim for inicio, fim in etiquetas + ancoras):
+            return m.group(0)
+        if any(inicio < m.end(2) and fim > m.start(2) for inicio, fim in etiquetas):
+            return m.group(0)
+        # O texto já passou pelo escape de HTML. Desfazê-lo só no endereço evita
+        # duplicar entidades e permite validar o mesmo valor que o navegador lerá.
+        href = endereco_seguro(htmlmod.unescape(m.group(2)))
+        if href is None:
+            return m.group(1)
+        return f'<a href="{htmlmod.escape(href, quote=True)}">{m.group(1)}</a>'
+
+    return RE_MD_LINK.sub(ancora, s)
 
 
 def esc(t: str) -> str:

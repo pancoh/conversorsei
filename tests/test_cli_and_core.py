@@ -339,6 +339,29 @@ def test_lote_recusa_destinos_coincidentes_sem_apagar_a_primeira_saida(tmp_path,
     assert 'Texto do documento 1.' not in conteudo
 
 
+def test_lote_respeita_a_caixa_do_sistema_de_arquivos(tmp_path):
+    (tmp_path / 'Nota.md').write_text('Primeiro documento.', encoding='utf-8')
+    (tmp_path / 'nota.txt').write_text('Segundo documento.', encoding='utf-8')
+    mesma_caixa = (tmp_path / 'nota.md').exists()
+    resultados = converter_diretorio(tmp_path, outdir=tmp_path / 'saida')
+    primeira = resultados[0].arquivos_gerados[0]
+    assert [r.sucesso for r in resultados] == ([True, False] if mesma_caixa else [True, True])
+    assert 'Primeiro documento.' in primeira.read_text(encoding='utf-8')
+    if mesma_caixa:
+        assert 'coincide' in resultados[1].erros[0]
+
+
+def test_saida_nao_pode_ser_link_fisico_da_entrada(tmp_path):
+    entrada = tmp_path / 'entrada.html'
+    entrada.write_text('<p>Original.</p>', encoding='utf-8')
+    saida = tmp_path / 'saida.html'
+    saida.hardlink_to(entrada)
+    resultado = converter_documento(entrada, caminho_saida=saida)
+    assert resultado.sucesso is False
+    assert 'próprio arquivo' in resultado.erros[0]
+    assert entrada.read_text(encoding='utf-8') == '<p>Original.</p>'
+
+
 def test_cli_controla_colisoes_entre_alvos_independentes(tmp_path, capsys):
     entradas = [tmp_path / nome for nome in ('nota.md', 'nota.txt')]
     for indice, entrada in enumerate(entradas):

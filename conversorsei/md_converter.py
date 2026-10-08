@@ -48,6 +48,10 @@ RE_COLUNA_MESCLADA_ODT = re.compile(r"^\ue001(\d+)\ue002")
 # As medidas atravessam o Markdown interno sem virar texto do documento.
 RE_LARGURAS_TABELA = re.compile(r"^\ue003(\d+(?:\.\d+)?);((?:\d+(?:\.\d+)?(?:,\d+(?:\.\d+)?)*)?)\ue004$")
 ATRIBUTO_LARGURAS_TABELA = "{urn:conversorsei}larguras"
+# Sublinhado e posição vertical não têm marcação Markdown. O leitor de HTML
+# transporta apenas esses atributos, sem aceitar HTML arbitrário no miolo.
+RE_FORMATO_INLINE = re.compile(r"\ue007([01])([012])\ue008(.*?)\ue009", re.DOTALL)
+RE_MARCAS_INLINE = re.compile(r"\ue007[01][012]\ue008|\ue009")
 # A nota só conta pela definição ("[^1]: texto" no início da linha): a chamada solta
 # confunde-se com texto comum, como a expressão "[^0-9]"
 RE_NOTA_MD = re.compile(r"^\s{0,3}\[\^[^\]\s]+\]:")
@@ -122,7 +126,26 @@ def desescapar_markdown(texto: str) -> str:
     A marca de quebra de linha do ODT vira espaço. Este texto serve para classificar e
     para mostrar trechos na tela, onde o caractere de uso privado colaria as palavras.
     """
-    return RE_ESCAPE_MD.sub(r"\1", texto).replace(MARCA_QUEBRA_ODT, " ")
+    return RE_MARCAS_INLINE.sub("", RE_ESCAPE_MD.sub(r"\1", texto)).replace(MARCA_QUEBRA_ODT, " ")
+
+
+def marcar_formato_inline(texto: str, sublinhado: bool, vertical: str | None) -> str:
+    """Leva ao DOCX apenas formatação que o Markdown não representa."""
+    if not sublinhado and vertical is None:
+        return texto
+    posicao = {None: "0", "superscript": "1", "subscript": "2"}[vertical]
+    return f"\ue007{int(sublinhado)}{posicao}\ue008{texto}\ue009"
+
+
+def trechos_com_formato(texto: str):
+    posicao = 0
+    for marca in RE_FORMATO_INLINE.finditer(texto):
+        if marca.start() > posicao:
+            yield texto[posicao:marca.start()], False, None
+        yield marca.group(3), marca.group(1) == "1", {"0": None, "1": "superscript", "2": "subscript"}[marca.group(2)]
+        posicao = marca.end()
+    if posicao < len(texto):
+        yield texto[posicao:], False, None
 
 
 def texto_sem_marcacao(texto: str) -> str:
@@ -137,7 +160,7 @@ def texto_sem_marcacao(texto: str) -> str:
         "".join(t[1] for t in _split_emphasis(p[2])) if p[0] == "link" else p[1]
         for p in partes
     )
-    return restaurar_escapes(simples).replace(MARCA_QUEBRA_ODT, "\n")
+    return RE_MARCAS_INLINE.sub("", restaurar_escapes(simples)).replace(MARCA_QUEBRA_ODT, "\n")
 
 
 def proteger_escapes(texto: str) -> str:
@@ -197,33 +220,42 @@ def adicionar_hiperlink(
         # Rótulo sem texto visível continua mostrando a URL, com a ênfase escolhida.
         partes = [("text", url, partes[0][2], partes[0][3], partes[0][4], partes[0][5])]
     for _, trecho, forte, enfase, cor_trecho, risco in partes:
-        new_run = OxmlElement("w:r")
-        rPr = OxmlElement("w:rPr")
-        rFonts = OxmlElement("w:rFonts")
-        rFonts.set(qn("w:ascii"), "Calibri")
-        rFonts.set(qn("w:hAnsi"), "Calibri")
-        rPr.append(rFonts)
-        sz = OxmlElement("w:sz")
-        sz.set(qn("w:val"), "22")
-        rPr.append(sz)
-        for nome, ligado in (("b", forte), ("i", enfase), ("strike", risco)):
-            marca = OxmlElement(f"w:{nome}")
-            marca.set(qn("w:val"), "1" if ligado else "0")
-            rPr.append(marca)
-        if cor_trecho:
-            marca_cor = OxmlElement("w:color")
-            marca_cor.set(qn("w:val"), cor_trecho)
-            rPr.append(marca_cor)
-        new_run.append(rPr)
-        for indice, linha in enumerate(restaurar_escapes(trecho).split(MARCA_QUEBRA_ODT)):
-            if indice:
-                new_run.append(OxmlElement("w:br"))
-            t = OxmlElement("w:t")
-            t.set(qn("xml:space"), "preserve")
-            t.text = linha
-            new_run.append(t)
-        hyperlink.append(new_run)
+        for texto, _sublinhado, vertical in trechos_com_formato(trecho):
+            _adicionar_run_de_link(hyperlink, texto, forte, enfase, cor_trecho, risco, vertical)
     paragraph._p.append(hyperlink)
+
+
+def _adicionar_run_de_link(hyperlink, trecho, forte, enfase, cor_trecho, risco, vertical) -> None:
+    new_run = OxmlElement("w:r")
+    rPr = OxmlElement("w:rPr")
+    rFonts = OxmlElement("w:rFonts")
+    rFonts.set(qn("w:ascii"), "Calibri")
+    rFonts.set(qn("w:hAnsi"), "Calibri")
+    rPr.append(rFonts)
+    sz = OxmlElement("w:sz")
+    sz.set(qn("w:val"), "22")
+    rPr.append(sz)
+    for nome, ligado in (("b", forte), ("i", enfase), ("strike", risco)):
+        marca = OxmlElement(f"w:{nome}")
+        marca.set(qn("w:val"), "1" if ligado else "0")
+        rPr.append(marca)
+    if cor_trecho:
+        marca_cor = OxmlElement("w:color")
+        marca_cor.set(qn("w:val"), cor_trecho)
+        rPr.append(marca_cor)
+    if vertical:
+        marca_vertical = OxmlElement("w:vertAlign")
+        marca_vertical.set(qn("w:val"), vertical)
+        rPr.append(marca_vertical)
+    new_run.append(rPr)
+    for indice, linha in enumerate(restaurar_escapes(trecho).split(MARCA_QUEBRA_ODT)):
+        if indice:
+            new_run.append(OxmlElement("w:br"))
+        t = OxmlElement("w:t")
+        t.set(qn("xml:space"), "preserve")
+        t.text = linha
+        new_run.append(t)
+    hyperlink.append(new_run)
 
 
 def parse_markdown_inline(text: str) -> list[tuple]:
@@ -333,8 +365,10 @@ def add_text_run(
     is_heading: bool,
     level: int,
     riscado: bool = False,
+    sublinhado: bool = False,
+    vertical: str | None = None,
 ):
-    chave = (bold, italic, color, is_heading, level, riscado)
+    chave = (bold, italic, color, is_heading, level, riscado, sublinhado, vertical)
     partes = restaurar_escapes(run_text).split("\n")
     for idx, parte in enumerate(partes):
         if idx:
@@ -347,6 +381,11 @@ def add_text_run(
             r._r.insert(0, copy.deepcopy(modelo))
             continue
         formatar_run(r, bold, italic, color, is_heading, level, riscado)
+        r.font.underline = sublinhado
+        if vertical == "superscript":
+            r.font.superscript = True
+        elif vertical == "subscript":
+            r.font.subscript = True
         _RPR_POR_FORMATO[chave] = copy.deepcopy(r._r.rPr)
 
 
@@ -410,11 +449,13 @@ def format_paragraph(
             continue
 
         _, run_text, bold, italic, color, riscado = seg
-        for indice, trecho in enumerate(run_text.split(MARCA_QUEBRA_ODT)):
-            if indice:
-                p.add_run().add_break()
-            if trecho:
-                add_text_run(p, trecho, bold, italic, color, is_heading, level, riscado or riscado_inteiro)
+        for texto, sublinhado, vertical in trechos_com_formato(run_text):
+            for indice, trecho in enumerate(texto.split(MARCA_QUEBRA_ODT)):
+                if indice:
+                    p.add_run().add_break()
+                if trecho:
+                    add_text_run(p, trecho, bold, italic, color, is_heading, level,
+                                 riscado or riscado_inteiro, sublinhado, vertical)
 
 
 def aplicar_classe_sei(doc: DocumentoWord, p, classe: str) -> None:

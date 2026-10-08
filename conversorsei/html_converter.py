@@ -43,6 +43,7 @@ from conversorsei.md_converter import (
     linha_com_classe,
     linha_de_assinatura,
     marcar_colunas_mescladas,
+    marcar_formato_inline,
     marcar_larguras_tabela,
     riscar_inteiro,
 )
@@ -300,6 +301,8 @@ class Enfase:
     negrito: bool = False
     italico: bool = False
     riscado: bool = False
+    sublinhado: bool = False
+    vertical: str | None = None
 
 
 def enfase_do_no(no: No, herdada: Enfase) -> Enfase:
@@ -324,7 +327,11 @@ def enfase_do_no(no: No, herdada: Enfase) -> Enfase:
     decoracao = estilo.get("text-decoration", "") + " " + estilo.get("text-decoration-line", "")
     if "line-through" in decoracao:
         riscado = True
-    return Enfase(negrito, italico, riscado)
+    sublinhado = herdada.sublinhado or no.tag == "u" or "underline" in decoracao
+    vertical = {"sup": "superscript", "sub": "subscript"}.get(no.tag, herdada.vertical)
+    if estilo.get("vertical-align") in ("super", "sub", "baseline"):
+        vertical = {"super": "superscript", "sub": "subscript", "baseline": None}[estilo["vertical-align"]]
+    return Enfase(negrito, italico, riscado, sublinhado, vertical)
 
 
 def _endereco_do_link(href: str) -> str | None:
@@ -362,36 +369,61 @@ class LeitorHtml:
     # Texto dos parágrafos
 
     def _inline(self, nos: list[No | str], enfase: Enfase, trechos: list[Enfase]) -> str:
-        partes: list[str] = []
-        for no in nos:
-            if isinstance(no, str):
-                texto = RE_ESPACOS.sub(" ", no)
-                if texto.strip():
-                    trechos.append(enfase)
-                partes.append(escapar_markdown(texto))
-                continue
-            if no.tag == "br":
-                partes.append(MARCA_QUEBRA_ODT)
-                continue
-            if no.tag == "img":
-                self.imagens = True
-                continue
-            propria = enfase_do_no(no, enfase)
-            interno = self._inline(no.filhos, propria, trechos)
-            if no.tag == "a":
-                endereco = _endereco_do_link(no.attrs.get("href", ""))
-                if endereco:
-                    interno = _envolver(interno, "[", f"]({endereco})")
-            if propria.negrito and not enfase.negrito:
-                interno = _envolver(interno, "**")
-            if propria.italico and not enfase.italico:
-                interno = _envolver(interno, "*")
-            if propria.riscado and not enfase.riscado:
-                interno = _envolver(interno, "~~")
-            if no.tag in BLOCOS:
-                # Parágrafos dentro de um item de lista ou de uma célula viram uma linha só
-                interno = f" {interno} "
-            partes.append(interno)
+        # A formatação é resolvida no texto, antes de escrever as marcas. Envolver
+        # o pai inteiro em ** tornaria impossível desligar o negrito num filho.
+        lidos: list[tuple[str, Enfase, str | None]] = []
+
+        def guardar(texto: str, formato: Enfase, link: str | None) -> None:
+            if texto.strip() and texto != MARCA_QUEBRA_ODT:
+                trechos.append(formato)
+            if lidos and lidos[-1][1:] == (formato, link):
+                anterior = lidos[-1][0]
+                lidos[-1] = (anterior + texto, formato, link)
+            else:
+                lidos.append((texto, formato, link))
+
+        def visitar(filhos: list[No | str], formato: Enfase, link: str | None = None) -> None:
+            for no in filhos:
+                if isinstance(no, str):
+                    guardar(escapar_markdown(RE_ESPACOS.sub(" ", no)), formato, link)
+                elif no.tag == "br":
+                    guardar(MARCA_QUEBRA_ODT, formato, link)
+                elif no.tag == "img":
+                    self.imagens = True
+                else:
+                    propria = enfase_do_no(no, formato)
+                    endereco = _endereco_do_link(no.attrs.get("href", "")) if no.tag == "a" else link
+                    if no.tag in BLOCOS:
+                        guardar(" ", propria, endereco)
+                    visitar(no.filhos, propria, endereco)
+                    if no.tag in BLOCOS:
+                        guardar(" ", propria, endereco)
+
+        visitar(nos, enfase)
+        partes = []
+        rotulo: list[str] = []
+        link_anterior: str | None = None
+        for texto, formato, link in lidos:
+            if link != link_anterior:
+                if rotulo:
+                    partes.append(_envolver("".join(rotulo), "[", f"]({link_anterior})"))
+                    rotulo = []
+                link_anterior = link
+            texto = marcar_formato_inline(texto, formato.sublinhado, formato.vertical)
+            if formato.negrito and formato.italico:
+                texto = _envolver(texto, "***")
+            elif formato.negrito:
+                texto = _envolver(texto, "**")
+            elif formato.italico:
+                texto = _envolver(texto, "*")
+            if formato.riscado:
+                texto = _envolver(texto, "~~")
+            if link:
+                rotulo.append(texto)
+            else:
+                partes.append(texto)
+        if rotulo:
+            partes.append(_envolver("".join(rotulo), "[", f"]({link_anterior})"))
         return "".join(partes)
 
     def _texto(self, nos: list[No | str], trechos: list[Enfase]) -> str:
@@ -448,7 +480,7 @@ class LeitorHtml:
 
     def _paragrafo(self, nos: list[No | str], dono: No | None, contexto: Contexto) -> None:
         trechos: list[Enfase] = []
-        texto = self._texto(nos, trechos)
+        texto = self._texto([dono] if dono is not None else nos, trechos)
         if not texto:
             return
         visivel = desescapar_markdown(texto)
@@ -476,7 +508,7 @@ class LeitorHtml:
 
     def _titulo(self, no: No, nivel: int) -> None:
         trechos: list[Enfase] = []
-        texto = self._texto(no.filhos, trechos)
+        texto = self._texto([no], trechos)
         if not texto:
             return
         if all(t.riscado for t in trechos):
@@ -599,7 +631,9 @@ class LeitorHtml:
         celulas = [linha for linha in celulas if linha]
         if not celulas:
             return
-        if len(celulas) == 1 and len(celulas[0]) == 1 and _tem_bloco(celulas[0][0]):
+        if len(celulas) == 1 and len(celulas[0]) == 1 and sum(
+            isinstance(filho, No) and filho.tag in BLOCOS for filho in celulas[0][0].filhos
+        ) > 1:
             # Tabela de uma célula com vários parágrafos é moldura de página: numa tabela
             # Markdown, o documento inteiro viraria uma linha só
             self.blocos(celulas[0][0], contexto)

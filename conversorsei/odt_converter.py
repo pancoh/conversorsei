@@ -141,7 +141,7 @@ def ler_xmls(caminho_odt: FonteDocumento) -> tuple[ElementTree.Element, ElementT
     return raiz, _xml_opcional(estilos)
 
 
-def mapear_heranca(raiz: ElementTree.Element) -> dict[str, str]:
+def mapear_heranca(*raizes: ElementTree.Element | None) -> dict[str, str]:
     """Mapeia cada estilo automático ao estilo do qual ele herda.
 
     O LibreOffice nem sempre marca um título como <text:h>: quando o documento vem de
@@ -149,14 +149,10 @@ def mapear_heranca(raiz: ElementTree.Element) -> dict[str, str]:
     Heading_20_1. Sem seguir a herança, o título viraria parágrafo comum e o SEI perderia
     a numeração da seção.
     """
-    heranca: dict[str, str] = {}
-    for automaticos in raiz.iter(_q("office", "automatic-styles")):
-        for estilo in automaticos.findall(_q("style", "style")):
-            nome = estilo.get(_q("style", "name"))
-            pai = estilo.get(_q("style", "parent-style-name"))
-            if nome and pai:
-                heranca[nome] = pai
-    return heranca
+    return {
+        nome: pai for nome, estilo in tabela_de_estilos(*raizes).items()
+        if (pai := estilo.get(_q("style", "parent-style-name")))
+    }
 
 
 def nivel_do_estilo(nome_estilo: str | None, heranca: dict[str, str]) -> int:
@@ -177,24 +173,31 @@ def _eh_riscado(valor: str | None) -> bool:
     return valor is not None and valor != "none"
 
 
-def mapear_estilos(raiz: ElementTree.Element) -> dict[str, FormatoTrecho]:
-    """Mapeia cada estilo automático para (negrito, itálico, riscado).
+def mapear_estilos(*raizes: ElementTree.Element | None) -> dict[str, FormatoTrecho]:
+    """Resolve a ênfase dos estilos automáticos e nomeados, atributo por atributo.
 
-    O ODF guarda a formatação em estilos nomeados, e não no próprio texto: o
-    <text:span> só aponta para o nome do estilo declarado em office:automatic-styles.
+    styles.xml pode guardar o estilo de caractere e os ancestrais de um estilo
+    automático. Um valor normal explícito vence o valor herdado.
     """
+    tabela = tabela_de_estilos(*raizes)
     estilos: dict[str, FormatoTrecho] = {}
-    for automaticos in raiz.iter(_q("office", "automatic-styles")):
-        for estilo in automaticos.findall(_q("style", "style")):
-            nome = estilo.get(_q("style", "name"))
+    atributos = (_q("fo", "font-weight"), _q("fo", "font-style"), _q("style", "text-line-through-style"))
+    for nome in tabela:
+        valores: list[str | None] = [None, None, None]
+        atual: str | None = nome
+        visitados: set[str] = set()
+        for _ in range(LIMITE_HERANCA):
+            if atual is None or atual in visitados or atual not in tabela:
+                break
+            visitados.add(atual)
+            estilo = tabela[atual]
             props = estilo.find(_q("style", "text-properties"))
-            if not nome or props is None:
-                continue
-            negrito = props.get(_q("fo", "font-weight")) == "bold"
-            italico = props.get(_q("fo", "font-style")) == "italic"
-            riscado = _eh_riscado(props.get(_q("style", "text-line-through-style")))
-            if negrito or italico or riscado:
-                estilos[nome] = (negrito, italico, riscado)
+            if props is not None:
+                for i, atributo in enumerate(atributos):
+                    if valores[i] is None:
+                        valores[i] = props.get(atributo)
+            atual = estilo.get(_q("style", "parent-style-name"))
+        estilos[nome] = (valores[0] == "bold", valores[1] == "italic", _eh_riscado(valores[2]))
     return estilos
 
 
@@ -731,8 +734,8 @@ def extrair_markdown_odt(
         for celula in raiz.iter(_q("table", "table-cell"))
     ):
         avisos.append("Uma tabela tem células mescladas entre linhas. Confira a tabela no resultado e no SEI.")
-    estilos = mapear_estilos(raiz)
-    heranca = mapear_heranca(raiz)
+    estilos = mapear_estilos(raiz, raiz_estilos)
+    heranca = mapear_heranca(raiz, raiz_estilos)
 
     corpo = raiz.find(f"{_q('office', 'body')}/{_q('office', 'text')}")
     if corpo is None:

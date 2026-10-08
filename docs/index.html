@@ -348,6 +348,10 @@
       <div id="novidades-lista" class="p-5 overflow-y-auto space-y-5 text-sm text-slate-600">
         <!-- novidades:inicio -->
         <section class="space-y-2">
+          <h4 class="font-semibold text-slate-800">Versão 0.7.3 <span class="font-normal text-slate-500">8 de outubro de 2026</span></h4>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Links do Word.</strong> Endereços em links Markdown escritos no documento são escapados antes de entrar no HTML, sem permitir que aspas acrescentem atributos ao link.</li><li><strong>Saídas em lote.</strong> A linha de comando também detecta nomes que diferem apenas por maiúsculas em sistemas que os tratam como o mesmo arquivo. Na web, documentos com o mesmo nome recebem pastas distintas no ZIP, preservando todas as saídas.</li><li><strong>Formatação do HTML.</strong> Sublinhado, sobrescrito e subscrito são preservados. Negrito e itálico no próprio parágrafo são lidos, e um trecho interno pode voltar à formatação normal. Tabelas de uma célula com um único parágrafo mantêm a tabela e sua largura.</li><li><strong>Estilos do LibreOffice.</strong> A ênfase dos estilos de caractere nomeados e os títulos que herdam de estilos intermediários em <code>styles.xml</code> são reconhecidos.</li></ul>
+        </section>
+        <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Versão 0.7.2 <span class="font-normal text-slate-500">8 de outubro de 2026</span></h4>
           <ul class="list-disc pl-5 space-y-1.5"><li><strong>Tabelas grandes sem travar.</strong> Uma tabela de mil linhas em Markdown, LibreOffice, HTML ou PDF levava cerca de 28 segundos e congelava a página. Agora leva menos de um segundo, como no Word.</li><li><strong>Repetição de células no LibreOffice.</strong> As células e linhas vazias que o LibreOffice repete no fim da tabela saem do resultado, e o que a repetição acrescenta tem limite, com aviso. Um valor inválido nesse atributo deixa de interromper a conversão.</li><li><strong>Títulos e citações do Word.</strong> O negrito e o itálico do estilo do parágrafo voltam a ficar com a classe do SEI: desde a 0.7.1, o Título 1 saía com negrito no texto e a citação, em itálico. A ênfase do estilo de caractere continua no texto.</li><li><strong>Links do Word.</strong> O link sai sem o sublinhado e a cor do estilo do Word, como os links dos outros formatos.</li><li><strong>Modo watch.</strong> Apagado ou renomeado um documento, o nome da saída dele fica livre de novo. A mensagem de saídas coincidentes passa a orientar renomear ou separar as pastas.</li></ul>
         </section>
@@ -443,7 +447,7 @@
           </p>
           <!-- A versão vem do CHANGELOG.md, gravada pelo scripts/bundle_web.py -->
           <button id="btn-novidades" type="button" class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline" title="Ver as novidades de cada versão">
-            <i data-lucide="tag" class="w-3.5 h-3.5"></i>versão <span id="versao-atual">0.7.2</span>
+            <i data-lucide="tag" class="w-3.5 h-3.5"></i>versão <span id="versao-atual">0.7.3</span>
             <span aria-hidden="true" class="mx-1 text-slate-300">·</span>novidades
           </button>
         </div>
@@ -474,7 +478,7 @@
   </footer>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=a06b40c401"></script>
+  <script src="app.js?v=2fdbd10a3d"></script>
 
   <!-- Contagem de acessos, sem cookies. Fica fora do service worker: sem rede, a visita
        apenas não é contada, e a página continua abrindo -->

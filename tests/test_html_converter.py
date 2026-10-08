@@ -129,6 +129,36 @@ def test_tabela_de_uma_celula_com_paragrafos_e_moldura():
     assert markdown.split() == ["Primeiro.", "Segundo."]
 
 
+@pytest.mark.parametrize('html,esperado', [
+    ('<p>10 m<sup>2</sup>; CO<sub>2</sub>.</p>', '10 m<sup>2</sup>; CO<sub>2</sub>.'),
+    ('<p><u>trecho sublinhado</u></p>', '<u>trecho sublinhado</u>'),
+    ('<p style="font-weight:bold">Destacado.</p>', '<strong>Destacado.</strong>'),
+    ('<p><strong>forte <span style="font-weight:normal">normal</span></strong></p>', '<strong>forte</strong> normal'),
+    ('<p><em>itálico <span style="font-style:normal">normal</span></em></p>', '<em>itálico</em> normal'),
+    ('<p><strong><u>m<sup>2</sup></u></strong></p>', '<strong><u>m</u></strong><strong><u><sup>2</sup></u></strong>'),
+    ('<p><a href="https://exemplo.org">CO<sub>2</sub></a></p>', '<a href="https://exemplo.org">CO<sub>2</sub></a>'),
+    ('<p><span style="text-decoration:underline;vertical-align:super">2</span></p>', '<u><sup>2</sup></u>'),
+])
+def test_formato_inline_html_preservado_e_volta_igual(html, esperado):
+    ida = _converter(html)
+    corpo = _corpo(ida['arquivos'][0]['conteudo'])
+    assert esperado in corpo
+    assert not ida['avisos']
+    volta = _converter(ida['arquivos'][0]['conteudo'])
+    assert _corpo(volta['arquivos'][0]['conteudo']) == corpo
+    assert not any('\ue007' in arq['conteudo'] for arq in volta['arquivos'])
+
+
+def test_tabela_de_uma_celula_com_um_paragrafo_mantem_largura_e_classe():
+    html = '<table width="70%"><tr><td width="100%"><p class="Tabela_Texto_Centralizado">A</p></td></tr></table>'
+    ida = _converter(html)['arquivos'][0]['conteudo']
+    corpo = _corpo(ida)
+    assert '<table' in corpo and 'width="70%"' in corpo
+    assert '<p class="Tabela_Texto_Centralizado">' in corpo
+    assert '<strong>A</strong>' in corpo
+    assert _corpo(_converter(ida)['arquivos'][0]['conteudo']) == corpo
+
+
 def test_assinatura_e_autenticidade_do_sei_saem_com_aviso():
     avisos: list[str] = []
     markdown = _markdown(

@@ -733,6 +733,7 @@ async function processFiles(files) {
   currentOriginalName = `${files.length} documentos`;
 
   const gerados = [];
+  const origensUsadas = new Set();
   const avisos = [];
   const falhas = [];
   let citacoes = 0;
@@ -757,7 +758,11 @@ async function processFiles(files) {
       // A origem acompanha o arquivo: dois documentos podem gerar o mesmo nome de
       // saída (nota.odt e nota.docx viram nota_SEI.html), e sem separá-los um
       // sobrescreveria o outro dentro do ZIP
-      const origem = resultado.nome_origem || file.name;
+      const nomeOrigem = resultado.nome_origem || file.name;
+      let origem = nomeOrigem;
+      let sufixo = 2;
+      while (origensUsadas.has(origem)) origem = `${nomeOrigem} (${sufixo++})`;
+      origensUsadas.add(origem);
       resultado.arquivos.forEach(arq => gerados.push({ ...arq, origem }));
       (resultado.avisos || []).forEach(a => avisos.push(`${file.name}: ${a}`));
       if (resultado.citacoes_por_recuo || resultado.citacoes_entre_aspas) {

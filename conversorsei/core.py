@@ -275,11 +275,16 @@ def converter_documento(
     destino = saida_base.resolve()
     origem = p_in.resolve()
     outra_origem = (destinos_reservados or {}).get(destino)
-    if destino == origem:
+    if outra_origem is None and destino.exists():
+        outra_origem = next(
+            (fonte for reservado, fonte in (destinos_reservados or {}).items() if mesmo_arquivo(destino, reservado)),
+            None,
+        )
+    if mesmo_arquivo(destino, origem):
         resultado.sucesso = False
         resultado.erros.append(f"A saída {saida_base} é o próprio arquivo de entrada. Escolha outro nome.")
         return resultado
-    if outra_origem is not None and outra_origem != origem:
+    if outra_origem is not None and not mesmo_arquivo(outra_origem, origem):
         # O --saida não serve ao lote nem ao watch: a orientação é a que vale nos dois
         resultado.sucesso = False
         resultado.erros.append(
@@ -302,6 +307,20 @@ def converter_documento(
         resultado.avisos.extend(validar_saida(conteudo, origem_markdown=p_in.suffix.lower() == ".md"))
 
     return resultado
+
+
+def mesmo_arquivo(primeiro: Path, segundo: Path) -> bool:
+    """O sistema de arquivos decide se nomes com caixas diferentes são o mesmo arquivo.
+
+    As saídas reservadas já existem no disco. samefile também cobre links físicos,
+    sem impedir nomes distintos em sistemas que diferenciam maiúsculas.
+    """
+    if primeiro == segundo:
+        return True
+    try:
+        return primeiro.samefile(segundo)
+    except OSError:
+        return False
 
 
 def converter_bytes(

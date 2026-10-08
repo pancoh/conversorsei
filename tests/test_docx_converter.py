@@ -1,5 +1,6 @@
 import io
 import re
+from html.parser import HTMLParser
 
 import docx
 import pytest
@@ -13,6 +14,43 @@ from conversorsei.docx_converter import (
     converter_docx_para_html,
     remover_tags_vazias,
 )
+
+
+@pytest.mark.parametrize("endereco", [
+    'https://exemplo.org/"/onmouseover="window.teste=1',
+    'https://exemplo.org/?a=1&b=2',
+    'https://exemplo.org/?a=&quot;',
+])
+def test_link_markdown_residual_escapa_apenas_o_endereco(endereco):
+    atributos = []
+
+    class Leitor(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            if tag == "a":
+                atributos.append(attrs)
+
+    doc = docx.Document()
+    doc.add_paragraph(f'[Texto & referência]({endereco})')
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    blocos = converter_docx_para_blocos(io.BytesIO(buffer.getvalue()))
+    Leitor().feed("".join(blocos))
+    assert atributos == [[("href", endereco)]]
+    assert "Texto &amp; referência</a>" in "".join(blocos)
+
+
+def test_link_nativo_nao_reprocessa_markdown_no_endereco_ou_rotulo():
+    from conversorsei.md_converter import adicionar_hiperlink
+
+    doc = docx.Document()
+    endereco = 'https://exemplo.org/?x=[teste](https://outro.org)'
+    rotulo = '[Referência](https://terceiro.org)'
+    adicionar_hiperlink(doc.add_paragraph(), endereco, rotulo)
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    html = ''.join(converter_docx_para_blocos(io.BytesIO(buffer.getvalue())))
+    assert html.count('<a ') == 1
+    assert f'<a href="{endereco}">{rotulo}</a>' in html
 
 
 def test_docx_strip_numeracao_item():

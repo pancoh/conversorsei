@@ -15,6 +15,72 @@ import pytest
 from conversorsei.core import converter_documento
 from conversorsei.odt_converter import extrair_markdown_odt
 
+
+def _odt_com_estilos_nomeados(tmp_path, automaticos, corpo, nomeados):
+    namespaces = (
+        'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+        'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
+        'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
+        'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"'
+    )
+    content = (
+        f'<office:document-content {namespaces}><office:automatic-styles>{automaticos}'
+        f'</office:automatic-styles><office:body><office:text>{corpo}</office:text>'
+        '</office:body></office:document-content>'
+    )
+    styles = f'<office:document-styles {namespaces}><office:styles>{nomeados}</office:styles></office:document-styles>'
+    caminho = tmp_path / 'estilos.odt'
+    with zipfile.ZipFile(caminho, 'w') as z:
+        z.writestr('mimetype', 'application/vnd.oasis.opendocument.text')
+        z.writestr('content.xml', content)
+        z.writestr('styles.xml', styles)
+    return caminho
+
+
+def test_odt_le_estilo_de_caractere_nomeado_e_heranca_com_valor_normal(tmp_path):
+    caminho = _odt_com_estilos_nomeados(
+        tmp_path,
+        '<style:style style:name="T1" style:family="text" style:parent-style-name="Destaque">'
+        '<style:text-properties fo:font-style="normal"/></style:style>',
+        '<text:p><text:span text:style-name="Destaque">Ênfase nomeada</text:span> '
+        '<text:span text:style-name="T1">Só negrito</text:span></text:p>',
+        '<style:style style:name="Destaque" style:family="text" style:parent-style-name="Base">'
+        '<style:text-properties fo:font-style="italic"/></style:style>'
+        '<style:style style:name="Base" style:family="text">'
+        '<style:text-properties fo:font-weight="bold"/></style:style>',
+    )
+    from conversorsei.core import converter_bytes
+
+    disco = converter_documento(caminho, outdir=tmp_path / 'saida', so_corpo=True)
+    memoria = converter_bytes(caminho.name, caminho.read_bytes(), so_corpo=True)
+    assert disco.sucesso and memoria.sucesso
+    html = memoria.arquivos[0].conteudo
+    assert '<strong><em>Ênfase nomeada</em></strong>' in html
+    assert '<strong>Só negrito</strong>' in html
+    assert disco.arquivos_gerados[0].read_text(encoding='utf-8') == html
+    assert memoria.avisos == []
+
+
+def test_odt_titulo_segue_estilo_nomeado_intermediario(tmp_path):
+    caminho = _odt_com_estilos_nomeados(
+        tmp_path,
+        '<style:style style:name="P1" style:family="paragraph" style:parent-style-name="MinhaSecao"/>',
+        '<text:p text:style-name="P1">Seção sem número</text:p>',
+        '<style:style style:name="MinhaSecao" style:family="paragraph" style:parent-style-name="Heading_20_1"/>',
+    )
+    resultado = converter_documento(caminho, outdir=tmp_path / 'saida', so_corpo=True)
+    assert resultado.sucesso
+    assert '<p class="Item_Nivel1">' in resultado.arquivos_gerados[0].read_text(encoding='utf-8')
+
+
+def test_odt_ciclo_de_estilos_nao_interrompe_conversao(tmp_path):
+    caminho = _odt_com_estilos_nomeados(
+        tmp_path, '', '<text:p><text:span text:style-name="A">Texto.</text:span></text:p>',
+        '<style:style style:name="A" style:family="text" style:parent-style-name="B"/>'
+        '<style:style style:name="B" style:family="text" style:parent-style-name="A"/>',
+    )
+    assert extrair_markdown_odt(caminho).strip() == 'Texto.'
+
 CONTENT_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content
   xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"

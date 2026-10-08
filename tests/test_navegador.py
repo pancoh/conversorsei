@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 import threading
 import time
+import zipfile
 from collections.abc import Iterator
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -151,6 +152,25 @@ def _enviar(pagina: object) -> None:
     pagina.set_input_files(  # type: ignore[attr-defined]
         "#file-input", files=[{"name": "nota.md", "mimeType": "text/markdown", "buffer": NOTA}]
     )
+
+
+def test_zip_preserva_documentos_com_mesmo_nome(contexto, endereco):
+    pagina = contexto.new_page()
+    pagina.goto(endereco)
+    _esperar_conversor(pagina)
+    pagina.set_input_files('#file-input', files=[
+        {'name': 'nota.md', 'mimeType': 'text/markdown', 'buffer': b'Primeiro documento.'},
+        {'name': 'nota.md', 'mimeType': 'text/markdown', 'buffer': b'Segundo documento.'},
+    ])
+    pagina.locator('#results-section').wait_for(state='visible', timeout=PRAZO_CONVERSAO_MS)
+    with pagina.expect_download() as download:
+        pagina.locator('#btn-download-top').click()
+    with zipfile.ZipFile(download.value.path()) as z:
+        arquivos = [nome for nome in z.namelist() if not nome.endswith('/')]
+        assert len(arquivos) == 2
+        assert set(arquivos) == {'nota.md/nota_SEI.html', 'nota.md (2)/nota_SEI.html'}
+        assert 'Primeiro documento.' in z.read(arquivos[0]).decode()
+        assert 'Segundo documento.' in z.read(arquivos[1]).decode()
 
 
 def _pdf_sem_texto() -> bytes:

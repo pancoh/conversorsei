@@ -5,6 +5,19 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+## 0.7.3 (2026-10-08)
+
+- **Links do Word.** Endereços em links Markdown escritos no documento são escapados antes
+  de entrar no HTML, sem permitir que aspas acrescentem atributos ao link.
+- **Saídas em lote.** A linha de comando também detecta nomes que diferem apenas por
+  maiúsculas em sistemas que os tratam como o mesmo arquivo. Na web, documentos com o mesmo
+  nome recebem pastas distintas no ZIP, preservando todas as saídas.
+- **Formatação do HTML.** Sublinhado, sobrescrito e subscrito são preservados. Negrito e
+  itálico no próprio parágrafo são lidos, e um trecho interno pode voltar à formatação normal.
+  Tabelas de uma célula com um único parágrafo mantêm a tabela e sua largura.
+- **Estilos do LibreOffice.** A ênfase dos estilos de caractere nomeados e os títulos que
+  herdam de estilos intermediários em `styles.xml` são reconhecidos.
+
 ## 0.7.2 (2026-10-08)
 
 - **Tabelas grandes sem travar.** Uma tabela de mil linhas em Markdown, LibreOffice, HTML ou
