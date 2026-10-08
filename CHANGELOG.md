@@ -13,6 +13,9 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
   do Word e de toda tabela vinda de Markdown, ODT, HTML ou PDF), a largura de cada uma passa
   a ser calculada pelo texto: uma coluna só com os números 1, 2, 3 fica estreita, e as de
   texto longo ficam largas. Larguras ajustadas no Word continuam como estão.
+- **Assinatura no meio do documento.** A assinatura que vem antes de um despacho, como a do
+  coordenador antes do "De acordo." da diretora, passa a sair como bloco de assinatura, e não
+  só a que fecha o documento. O bloco do meio começa na marca "[assinado eletronicamente]".
 
 ## 0.6.0 (2026-10-08)
 

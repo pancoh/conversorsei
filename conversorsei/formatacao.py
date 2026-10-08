@@ -291,6 +291,8 @@ MINIMO_LINHAS_ASSINATURA = 2
 
 # Marca da assinatura eletrônica, com ou sem colchetes ou parênteses
 RE_MARCA_ASSINATURA = re.compile(r"^[\[(]?\s*assinad[oa]\s+eletronicamente\s*[\])]?\.?$", re.IGNORECASE)
+# Nome, cargo e unidade não terminam em pontuação; "De acordo." e "Encaminhe-se:" sim
+RE_FIM_DE_FRASE = re.compile(r"[.,:;]$")
 
 
 def linha_curta(texto: str) -> bool:
@@ -330,9 +332,70 @@ def linhas_de_assinatura(candidatas: list[bool], curtas: list[str | None] | None
                 break
             finais += 1
         trecho = curtas[len(curtas) - finais :]
-        marca = next((i for i, texto in enumerate(trecho) if RE_MARCA_ASSINATURA.match(texto or "")), None)
+        # A primeira marca depois da qual só há marcas, nomes e cargos: um "De acordo." entre
+        # duas assinaturas deixa a primeira para indices_de_assinatura, como bloco do meio
+        marca = next(
+            (
+                i
+                for i, texto in enumerate(trecho)
+                if RE_MARCA_ASSINATURA.match(texto or "")
+                and not any(
+                    RE_FIM_DE_FRASE.search(t or "") and not RE_MARCA_ASSINATURA.match(t or "") for t in trecho[i:]
+                )
+            ),
+            None,
+        )
         if marca is not None:
             pela_marca = finais - marca
             if MINIMO_LINHAS_ASSINATURA <= pela_marca < len(curtas):
                 n = max(n, pela_marca)
     return n
+
+
+# Linhas de uma assinatura do meio do documento depois da marca, quando não há
+# centralização para dizer onde ela termina: nome, cargo, unidade e órgão
+MAXIMO_LINHAS_DEPOIS_DA_MARCA = 4
+
+
+def indices_de_assinatura(candidatas: list[bool], curtas: list[str | None] | None = None) -> set[int]:
+    """Posições das linhas que formam blocos de assinatura, no fim ou no meio do documento.
+
+    O bloco do fim segue linhas_de_assinatura. No meio, o bloco precisa começar na marca
+    "[assinado eletronicamente]": a nota assinada pelo coordenador e, depois do "De
+    acordo.", pela diretora tem duas assinaturas, e só a do fim era reconhecida. Sem a
+    marca, linhas centralizadas no meio são título ou destaque, e não assinatura.
+
+    Depois da marca centralizada, o bloco segue pelas linhas candidatas (centralizadas e
+    curtas). Com a marca sem centralização (texto colado, .txt), segue pelas linhas
+    curtas que não terminam em pontuação, até MAXIMO_LINHAS_DEPOIS_DA_MARCA: é o que
+    separa o cargo do "De acordo." da linha seguinte.
+    """
+    total = len(candidatas)
+    n = linhas_de_assinatura(candidatas, curtas)
+    indices = set(range(total - n, total))
+    if not curtas:
+        return indices
+    i = 0
+    while i < total - n:
+        marca = curtas[i]
+        if marca is None or not RE_MARCA_ASSINATURA.match(marca):
+            i += 1
+            continue
+        fim = i + 1
+        if candidatas[i]:
+            while fim < total and candidatas[fim]:
+                fim += 1
+        else:
+            while (
+                fim < total
+                and fim - i <= MAXIMO_LINHAS_DEPOIS_DA_MARCA
+                and (texto := curtas[fim]) is not None
+                and not RE_MARCA_ASSINATURA.match(texto)
+                and not RE_FIM_DE_FRASE.search(texto)
+            ):
+                fim += 1
+        # O bloco do meio que encosta no do fim é o mesmo bloco, já contado
+        if fim - i >= MINIMO_LINHAS_ASSINATURA and fim < total:
+            indices.update(range(i, fim))
+        i = max(fim, i + 1)
+    return indices

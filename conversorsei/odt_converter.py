@@ -19,8 +19,8 @@ from conversorsei.formatacao import (
     Formatacao,
     classe_sei_pelo_nome,
     fonte_predominante,
+    indices_de_assinatura,
     linha_curta,
-    linhas_de_assinatura,
     paragrafos_entre_aspas,
     pode_ser_linha_de_assinatura,
 )
@@ -550,8 +550,8 @@ def converter_corpo(
                 visitar(filho, dentro_de_lista=dentro_de_lista)
 
     visitar(corpo)
-    n = linhas_de_assinatura([candidata for _, candidata, _, _, _ in registros], [curta for *_, curta in registros])
-    for indice, _, formato, texto, _ in registros[len(registros) - n :] if n else []:
+    for i in indices_de_assinatura([candidata for _, candidata, *_ in registros], [curta for *_, curta in registros]):
+        indice, _, formato, texto, _ = registros[i]
         linhas[indice] = linha_de_assinatura(texto, formato)
     return linhas
 

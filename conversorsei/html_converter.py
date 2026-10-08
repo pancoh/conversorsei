@@ -27,8 +27,8 @@ from conversorsei.formatacao import (
     CitacaoPorRecuo,
     Formatacao,
     classe_sei_pelo_nome,
+    indices_de_assinatura,
     linha_curta,
-    linhas_de_assinatura,
     pode_ser_linha_de_assinatura,
 )
 from conversorsei.md_converter import (
@@ -617,10 +617,10 @@ class LeitorHtml:
 
     def markdown(self, raiz: No) -> str:
         self.blocos(raiz, Contexto())
-        n = linhas_de_assinatura(
-            [candidata for _, candidata, _, _, _ in self.registros], [curta for *_, curta in self.registros]
-        )
-        for indice, _, formato, texto, _ in self.registros[len(self.registros) - n :] if n else []:
+        for i in indices_de_assinatura(
+            [candidata for _, candidata, *_ in self.registros], [curta for *_, curta in self.registros]
+        ):
+            indice, _, formato, texto, _ = self.registros[i]
             self.linhas[indice] = linha_de_assinatura(texto, formato)
         return re.sub(r"\n{3,}", "\n\n", "\n".join(self.linhas)).strip()
 

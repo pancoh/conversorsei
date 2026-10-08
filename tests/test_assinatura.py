@@ -277,11 +277,57 @@ def test_sem_marca_ou_com_texto_depois_dela_nada_muda():
     sem_marca = TEXTO_SEM_ALINHAMENTO.replace("[assinado eletronicamente]\n", "")
     assert "Tabela_Texto_Centralizado" not in {c for c, _ in paragrafos(sem_marca.encode(), "t.txt")}
 
-    # Um parágrafo comprido depois da marca: o fim do documento não é assinatura
-    depois = TEXTO_SEM_ALINHAMENTO + (
+    # A marca seguida direto de um parágrafo comprido: falta nome e cargo para ser assinatura
+    so_marca = TEXTO_SEM_ALINHAMENTO.replace("FULANO DE TAL\nCoordenador-Geral\n", "") + (
         "Este parágrafo final é comprido demais para ser nome ou cargo, e por isso a marca acima não abre bloco.\n"
     )
-    assert "Tabela_Texto_Centralizado" not in {c for c, _ in paragrafos(depois.encode(), "t.txt")}
+    assert "Tabela_Texto_Centralizado" not in {c for c, _ in paragrafos(so_marca.encode(), "t.txt")}
+
+
+def test_assinatura_no_meio_do_documento_tambem_e_bloco():
+    """A nota assinada pelo coordenador e, depois do "De acordo.", pela diretora.
+
+    Só a assinatura do fim era reconhecida; a do meio saía como texto centralizado comum.
+    """
+    doc = docx.Document()
+    _p(doc, "Encaminha-se a Nota Técnica para análise.")
+    _p(doc, "Respeitosamente,")
+    _p(doc, "[assinado eletronicamente]", CENTRO)
+    _p(doc, "FULANO DE TAL", CENTRO)
+    _p(doc, "Coordenador-Geral de Gestão e Monitoramento do Programa", CENTRO)
+    _p(doc, "CGPAC/DMP/SE/MCID", CENTRO)
+    _p(doc, "De acordo. À Assessoria Especial de Controle Interno para interlocução com a CGU.")
+    _p(doc, "[assinado eletronicamente]", CENTRO)
+    _p(doc, "CICLANA DE TAL", CENTRO)
+    _p(doc, "Diretora de Monitoramento de Programas", CENTRO)
+    classes = [c for c, _ in paragrafos(_salvar(doc))]
+
+    assert classes == (
+        ["Texto_Justificado"] * 2 + ["Tabela_Texto_Centralizado"] * 4
+        + ["Texto_Justificado"] + ["Tabela_Texto_Centralizado"] * 3
+    )
+    marcas = [t for _, t in paragrafos(_salvar(doc)) if "Assinado" in t]
+    assert marcas == ["<em>[Assinado eletronicamente]</em>"] * 2
+
+
+def test_assinatura_no_meio_sem_centralizacao_para_antes_do_de_acordo():
+    """Sem centralização, o bloco do meio para na linha que termina em pontuação."""
+    texto = TEXTO_SEM_ALINHAMENTO + "De acordo.\n\n[assinado eletronicamente]\nCICLANA DE TAL\nDiretora\n"
+    corpo = paragrafos(texto.encode(), "t.txt")
+    assert [c for c, _ in corpo] == (
+        ["Texto_Justificado"] * 2 + ["Tabela_Texto_Centralizado"] * 3
+        + ["Texto_Justificado"] + ["Tabela_Texto_Centralizado"] * 3
+    )
+    assert corpo[5][1] == "De acordo."
+
+
+def test_linhas_centralizadas_no_meio_sem_marca_nao_sao_assinatura():
+    doc = docx.Document()
+    _p(doc, "Texto de abertura do documento.")
+    _p(doc, "QUADRO RESUMO", CENTRO)
+    _p(doc, "Situação em 2026", CENTRO)
+    _p(doc, "Texto que continua o documento depois do destaque centralizado.")
+    assert "Tabela_Texto_Centralizado" not in {c for c, _ in paragrafos(_salvar(doc))}
 
 
 def test_linhas_de_assinatura_pela_marca():

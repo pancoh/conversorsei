@@ -29,8 +29,8 @@ from conversorsei.formatacao import (
     classe_por_formatacao,
     classe_sei_pelo_nome,
     fonte_predominante,
+    indices_de_assinatura,
     linha_curta,
-    linhas_de_assinatura,
     maior_tamanho,
     paragrafos_entre_aspas,
     pode_ser_linha_de_assinatura,
@@ -751,8 +751,7 @@ def bloco_de_assinatura(doc: DocumentoWord) -> set:
                 elementos.append(filho)
                 candidatas.append(_linha_de_assinatura(doc, p))
                 curtas.append(_linha_curta_sem_classe(doc, p))
-    n = linhas_de_assinatura(candidatas, curtas)
-    return set(elementos[len(elementos) - n :]) if n else set()
+    return {elementos[i] for i in indices_de_assinatura(candidatas, curtas)}
 
 
 def citacao_entre_aspas(doc: DocumentoWord) -> set:
@@ -788,17 +787,20 @@ SEPARADOR_ASSINATURAS = f"{ABRE_ASSINATURA}&nbsp;</p>"
 def ajustar_assinaturas(blocos: list[str]) -> list[str]:
     """Padroniza a marca de assinatura e separa as assinaturas com uma linha em branco.
 
-    Olha só as linhas com a classe da assinatura que fecham o documento. Trabalha sobre
-    o HTML, e não sobre o Word, porque o ODT e o Markdown chegam aqui com a classe já
-    decidida (pelo nome do estilo no DOCX intermediário). Sem marca não há separação:
+    Olha as linhas com a classe da assinatura, em cada sequência delas: o documento pode
+    ter assinaturas no meio (a do coordenador antes do "De acordo." da diretora), e não
+    só no fim. Trabalha sobre o HTML, e não sobre o Word, porque o ODT e o Markdown chegam
+    aqui com a classe já decidida (pelo nome do estilo no DOCX intermediário). A linha em
+    branco só entra entre duas marcas da mesma sequência; sem marca não há separação, pois
     não dá para saber onde uma assinatura termina e a outra começa.
     """
-    inicio = len(blocos)
-    while inicio > 0 and blocos[inicio - 1].startswith(ABRE_ASSINATURA):
-        inicio -= 1
-    saida = blocos[:inicio]
+    saida: list[str] = []
     marcas = 0
-    for bloco in blocos[inicio:]:
+    for bloco in blocos:
+        if not bloco.startswith(ABRE_ASSINATURA):
+            marcas = 0
+            saida.append(bloco)
+            continue
         visivel = htmlmod.unescape(re.sub(r"<[^>]+>", "", bloco)).strip()
         if RE_MARCA_ASSINATURA.match(visivel):
             if marcas and saida[-1] != SEPARADOR_ASSINATURAS:
