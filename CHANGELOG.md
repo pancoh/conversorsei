@@ -5,6 +5,8 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+## 0.7.4 (2026-10-08)
+
 - **Página em moldura no HTML.** A página que põe o texto numa tabela de uma célula, com os
   parágrafos dentro de um bloco, volta a sair como parágrafos. Na 0.7.3, o documento inteiro
   saía numa única célula de tabela, numa linha só e em negrito.
