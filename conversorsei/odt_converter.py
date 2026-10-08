@@ -142,11 +142,11 @@ def ler_xmls(caminho_odt: FonteDocumento) -> tuple[ElementTree.Element, ElementT
 
 
 def mapear_heranca(*raizes: ElementTree.Element | None) -> dict[str, str]:
-    """Mapeia cada estilo automático ao estilo do qual ele herda.
+    """Mapeia cada estilo, automático (content.xml) ou nomeado (styles.xml), ao seu pai.
 
     O LibreOffice nem sempre marca um título como <text:h>: quando o documento vem de
     outro formato, o título costuma ser um <text:p> cujo estilo automático (P1) herda de
-    Heading_20_1. Sem seguir a herança, o título viraria parágrafo comum e o SEI perderia
+    Heading_20_1, às vezes através de um estilo nomeado intermediário. Sem seguir a herança, o título viraria parágrafo comum e o SEI perderia
     a numeração da seção.
     """
     return {
@@ -592,9 +592,9 @@ def converter_corpo(
 ) -> list[str]:
     """Percorre o corpo do documento devolvendo linhas de Markdown.
 
-    `heranca` cobre só os estilos automáticos, e serve à detecção de títulos, como
-    sempre serviu. `heranca_completa` inclui os estilos nomeados de styles.xml, para a
-    classe explícita ser achada também quando vem de um estilo nomeado derivado.
+    `heranca` serve à detecção de títulos e `heranca_completa` à classe explícita; desde a
+    0.7.3, as duas cobrem os estilos automáticos e os nomeados de styles.xml, e um título
+    que herda de Heading_20_1 por um estilo intermediário é achado.
     `citacao` conta os parágrafos com forma de citação e os converte quando pedido.
     `listas` traz, por estilo de lista, a numeração de cada nível (mapear_listas).
 

@@ -284,6 +284,29 @@ def _tem_bloco(no: No) -> bool:
     return any(isinstance(filho, No) and filho.tag in BLOCOS for filho in no.filhos)
 
 
+# Envoltórios de um bloco só que a busca da moldura atravessa ("<td><div><p>...")
+LIMITE_ENVOLTORIOS = 10
+
+
+def e_moldura(celula: No) -> bool:
+    """Indica se a célula única de uma tabela é moldura de página, e não tabela de verdade.
+
+    É moldura quando o conteúdo tem mais de um bloco, depois de abrir os envoltórios de um
+    bloco só: a página costuma pôr os parágrafos num <div> dentro da célula. A célula com
+    um parágrafo só continua tabela, com a largura que tem (um quadro de destaque).
+    """
+    no = celula
+    for _ in range(LIMITE_ENVOLTORIOS):
+        blocos = [filho for filho in no.filhos if isinstance(filho, No) and filho.tag in BLOCOS]
+        if len(blocos) != 1:
+            return len(blocos) > 1
+        if any(isinstance(filho, str) and filho.strip() for filho in no.filhos):
+            # Texto solto ao lado do bloco: são dois parágrafos
+            return True
+        no = blocos[0]
+    return False
+
+
 def _envolver(texto: str, abre: str, fecha: str | None = None) -> str:
     """Põe a marcação em volta do texto, deixando de fora os espaços das pontas.
 
@@ -631,9 +654,7 @@ class LeitorHtml:
         celulas = [linha for linha in celulas if linha]
         if not celulas:
             return
-        if len(celulas) == 1 and len(celulas[0]) == 1 and sum(
-            isinstance(filho, No) and filho.tag in BLOCOS for filho in celulas[0][0].filhos
-        ) > 1:
+        if len(celulas) == 1 and len(celulas[0]) == 1 and e_moldura(celulas[0][0]):
             # Tabela de uma célula com vários parágrafos é moldura de página: numa tabela
             # Markdown, o documento inteiro viraria uma linha só
             self.blocos(celulas[0][0], contexto)

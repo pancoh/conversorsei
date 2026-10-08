@@ -129,6 +129,31 @@ def test_tabela_de_uma_celula_com_paragrafos_e_moldura():
     assert markdown.split() == ["Primeiro.", "Segundo."]
 
 
+@pytest.mark.parametrize(
+    "celula",
+    [
+        "<div><p>Primeiro.</p><p>Segundo.</p></div>",
+        "<div><section><p>Primeiro.</p><p>Segundo.</p></section></div>",
+        "Primeiro.<p>Segundo.</p>",
+    ],
+)
+def test_moldura_com_envoltorio_continua_moldura(celula):
+    """A página costuma pôr os parágrafos num <div> dentro da célula: continua moldura.
+
+    Na 0.7.3, só o <p> direto contava, e o documento inteiro virava uma célula de tabela,
+    numa linha só e em negrito.
+    """
+    markdown = _markdown(f"<table><tr><td>{celula}</td></tr></table>")
+    assert "|" not in markdown
+    assert markdown.split() == ["Primeiro.", "Segundo."]
+
+
+@pytest.mark.parametrize("celula", ["<p>Só um.</p>", "<div><p>Só um.</p></div>", "Só um."])
+def test_celula_unica_com_um_paragrafo_continua_tabela(celula):
+    markdown = _markdown(f'<table width="50%"><tr><td>{celula}</td></tr></table>')
+    assert "| Só um. |" in markdown
+
+
 @pytest.mark.parametrize('html,esperado', [
     ('<p>10 m<sup>2</sup>; CO<sub>2</sub>.</p>', '10 m<sup>2</sup>; CO<sub>2</sub>.'),
     ('<p><u>trecho sublinhado</u></p>', '<u>trecho sublinhado</u>'),
