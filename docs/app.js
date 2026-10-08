@@ -1238,7 +1238,9 @@ function renderCitacao(recuo, aspas, documentos, trechos) {
         : `${total} parágrafos ${forma}${onde} foram convertidos como Citação.`;
     }
     btnCitacao.textContent = 'Manter citações como texto';
-    resCitacaoResumo.textContent = `Citações: ${total} ${um ? 'convertida' : 'convertidas'}`;
+    resCitacaoResumo.textContent = um
+      ? '1 parágrafo convertido como Citação.'
+      : `${total} parágrafos convertidos como Citação.`;
   } else {
     if (recuo && aspas) {
       resCitacaoTexto.textContent =
@@ -1253,7 +1255,9 @@ function renderCitacao(recuo, aspas, documentos, trechos) {
         : `${total} parágrafos${onde} estão em citações entre aspas com mais de uma linha. Eles saíram como texto comum.`;
     }
     btnCitacao.textContent = 'Converter como citação';
-    resCitacaoResumo.textContent = `Citações: ${total} ${um ? 'possível' : 'possíveis'}`;
+    resCitacaoResumo.textContent = um
+      ? '1 parágrafo com forma de citação saiu como texto comum.'
+      : `${total} parágrafos com forma de citação saíram como texto comum.`;
   }
   const itens = trechos.slice(0, MAXIMO_TRECHOS).map(t => `<li>${escapeHtml(t)}</li>`);
   if (trechos.length > MAXIMO_TRECHOS) {
@@ -1280,13 +1284,15 @@ function renderCabecalho(total, documentos, trechos) {
       ? `1 parágrafo antes do item 1${onde} foi omitido. O HTML copiado começa no item 1.`
       : `${total} parágrafos antes do item 1${onde} foram omitidos. O HTML copiado começa no item 1.`;
     btnCabecalho.textContent = 'Restaurar cabeçalho';
-    resCabecalhoResumo.textContent = `Cabeçalho: ${total} ${um ? 'parágrafo omitido' : 'parágrafos omitidos'}`;
+    resCabecalhoResumo.textContent =
+      `Cabeçalho omitido (${total} ${um ? 'parágrafo' : 'parágrafos'}). O HTML começa no item 1.`;
   } else {
     resCabecalhoTexto.textContent = um
       ? `1 parágrafo vem antes do item 1${onde}. Ele entra no HTML copiado. Se o SEI já gera o título e o número, omita.`
       : `${total} parágrafos vêm antes do item 1${onde}. Eles entram no HTML copiado. Se o SEI já gera o título e o número, omita.`;
     btnCabecalho.textContent = 'Omitir cabeçalho';
-    resCabecalhoResumo.textContent = `Cabeçalho: ${total} ${um ? 'parágrafo incluído' : 'parágrafos incluídos'}`;
+    resCabecalhoResumo.textContent =
+      `Cabeçalho incluído (${total} ${um ? 'parágrafo' : 'parágrafos'}). O SEI pode gerá-lo pelo modelo.`;
   }
   const itens = trechos.slice(0, MAXIMO_TRECHOS).map(t => `<li>${escapeHtml(t)}</li>`);
   if (trechos.length > MAXIMO_TRECHOS) {

@@ -5,6 +5,12 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+## 0.7.5 (2026-10-08)
+
+- **Caixa "Revisar ajustes do documento" mais visível.** Ganhou fundo azul claro, ícone e
+  a ação "Revisar" escrita ao lado da seta. O resumo diz o que foi feito e por que vale
+  abrir: "Cabeçalho incluído (6 parágrafos). O SEI pode gerá-lo pelo modelo."
+
 ## 0.7.4 (2026-10-08)
 
 - **Página em moldura no HTML.** A página que põe o texto numa tabela de uma célula, com os

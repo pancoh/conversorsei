@@ -17,7 +17,7 @@
   <!-- Bibliotecas servidas localmente (vendor/), com versão fixa e sem depender de CDN de terceiros -->
   <!-- O ?v= é a marca de versão do conteúdo, gravada por scripts/bundle_web.py: cada versão
        tem um endereço próprio, e nenhum cache entrega o HTML novo com o CSS ou o app.js antigo -->
-  <link href="estilos.css?v=36323ff692" rel="stylesheet">
+  <link href="estilos.css?v=627bf50339" rel="stylesheet">
   <link href="vendor/fonts.css" rel="stylesheet">
   <script src="vendor/lucide-1.33.0.min.js"></script>
   <script src="vendor/jszip-3.10.1.min.js"></script>
@@ -42,6 +42,7 @@
     .rotulos-sobrepostos > * { grid-area: 1 / 1; }
     #res-ajustes summary::-webkit-details-marker { display: none; }
     #res-ajustes[open] .ajustes-chevron { transform: rotate(180deg); }
+    #res-ajustes[open] .ajustes-rotulo-fechado, #res-ajustes:not([open]) .ajustes-rotulo-aberto { display: none; }
     #drop-ajuda summary::-webkit-details-marker { display: none; }
     #drop-ajuda[open] .privacidade-chevron { transform: rotate(180deg); }
     /* Em janelas altas, o formulário inicial ocupa o centro da área útil. O resultado
@@ -235,20 +236,31 @@
 
       <!-- Os ajustes ficam resumidos para o arquivo pronto aparecer sem rolagem longa.
            A pessoa pode abrir os trechos e refazer a conversão com cada escolha. -->
-      <details id="res-ajustes" class="hidden bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <summary class="list-none cursor-pointer px-5 py-4 flex items-center justify-between gap-4">
-          <span class="space-y-1">
-            <span class="block text-sm font-semibold text-slate-800">Revisar ajustes do documento</span>
-            <span class="flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-600">
-              <span id="res-cabecalho-resumo" class="hidden"></span>
-              <span id="res-citacao-resumo" class="hidden"></span>
+      <!-- Azul, e não âmbar: o âmbar é dos avisos, e a caixa é uma escolha, não um problema.
+           O "Revisar" escrito mostra que ela abre; a seta sozinha passava despercebida. -->
+      <details id="res-ajustes" class="hidden bg-blue-50/40 border border-blue-200 rounded-xl overflow-hidden">
+        <summary class="list-none cursor-pointer px-5 py-4 flex items-center justify-between gap-4 hover:bg-blue-50 transition-colors">
+          <span class="flex items-start gap-3">
+            <span class="p-1.5 bg-slate-100 text-blue-700 rounded-md flex-shrink-0">
+              <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+            </span>
+            <span class="space-y-1">
+              <span class="block text-sm font-semibold text-slate-800">Revisar ajustes do documento</span>
+              <span class="flex flex-col gap-1 text-sm text-slate-600">
+                <span id="res-cabecalho-resumo" class="hidden"></span>
+                <span id="res-citacao-resumo" class="hidden"></span>
+              </span>
             </span>
           </span>
-          <i data-lucide="chevron-down" class="ajustes-chevron w-4 h-4 flex-shrink-0 text-slate-500 transition-transform duration-200"></i>
+          <span class="flex items-center gap-1 flex-shrink-0 text-sm font-semibold text-blue-700">
+            <span class="ajustes-rotulo-fechado">Revisar</span>
+            <span class="ajustes-rotulo-aberto">Fechar</span>
+            <i data-lucide="chevron-down" class="ajustes-chevron w-4 h-4 transition-transform duration-200"></i>
+          </span>
         </summary>
 
         <!-- Cabeçalho antes do item 1: o SEI pode gerar esses dados pelo modelo. -->
-        <div id="res-cabecalho-card" class="hidden border-t border-slate-200 px-5 py-4">
+        <div id="res-cabecalho-card" class="hidden bg-white border-t border-blue-200 px-5 py-4">
           <div class="flex items-start gap-3 text-slate-800">
             <i data-lucide="panel-top" class="w-4 h-4 flex-shrink-0 mt-0.5 text-slate-500"></i>
             <div class="text-sm space-y-2">
@@ -263,7 +275,7 @@
         </div>
 
         <!-- Citação pela forma (recuo ou aspas): a conversão só aplica as regras a pedido. -->
-        <div id="res-citacao-card" class="hidden border-t border-slate-200 px-5 py-4">
+        <div id="res-citacao-card" class="hidden bg-white border-t border-blue-200 px-5 py-4">
           <div class="flex items-start gap-3 text-slate-800">
             <i data-lucide="text-quote" class="w-4 h-4 flex-shrink-0 mt-0.5 text-slate-500"></i>
             <div class="text-sm space-y-2">
@@ -347,6 +359,10 @@
       </div>
       <div id="novidades-lista" class="p-5 overflow-y-auto space-y-5 text-sm text-slate-600">
         <!-- novidades:inicio -->
+        <section class="space-y-2">
+          <h4 class="font-semibold text-slate-800">Versão 0.7.5 <span class="font-normal text-slate-500">8 de outubro de 2026</span></h4>
+          <ul class="list-disc pl-5 space-y-1.5"><li><strong>Caixa "Revisar ajustes do documento" mais visível.</strong> Ganhou fundo azul claro, ícone e a ação "Revisar" escrita ao lado da seta. O resumo diz o que foi feito e por que vale abrir: "Cabeçalho incluído (6 parágrafos). O SEI pode gerá-lo pelo modelo."</li></ul>
+        </section>
         <section class="space-y-2">
           <h4 class="font-semibold text-slate-800">Versão 0.7.4 <span class="font-normal text-slate-500">8 de outubro de 2026</span></h4>
           <ul class="list-disc pl-5 space-y-1.5"><li><strong>Página em moldura no HTML.</strong> A página que põe o texto numa tabela de uma célula, com os parágrafos dentro de um bloco, volta a sair como parágrafos. Na 0.7.3, o documento inteiro saía numa única célula de tabela, numa linha só e em negrito.</li></ul>
@@ -451,7 +467,7 @@
           </p>
           <!-- A versão vem do CHANGELOG.md, gravada pelo scripts/bundle_web.py -->
           <button id="btn-novidades" type="button" class="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline" title="Ver as novidades de cada versão">
-            <i data-lucide="tag" class="w-3.5 h-3.5"></i>versão <span id="versao-atual">0.7.4</span>
+            <i data-lucide="tag" class="w-3.5 h-3.5"></i>versão <span id="versao-atual">0.7.5</span>
             <span aria-hidden="true" class="mx-1 text-slate-300">·</span>novidades
           </button>
         </div>
@@ -482,7 +498,7 @@
   </footer>
 
   <!-- Script da Aplicação -->
-  <script src="app.js?v=2fdbd10a3d"></script>
+  <script src="app.js?v=94318aa353"></script>
 
   <!-- Contagem de acessos, sem cookies. Fica fora do service worker: sem rede, a visita
        apenas não é contada, e a página continua abrindo -->

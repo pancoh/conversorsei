@@ -231,11 +231,16 @@ def test_converte_omite_cabecalho_copia_e_funciona_sem_rede(
     assert pagina.locator("#results-section").evaluate(
         "el => el.previousElementSibling.id === 'pyodide-status-card'"
     )
-    assert "3 parágrafos incluídos" in pagina.locator("#res-cabecalho-resumo").inner_text()
+    assert "Cabeçalho incluído (3 parágrafos)" in pagina.locator("#res-cabecalho-resumo").inner_text()
     assert not pagina.locator("#res-ajustes").evaluate("el => el.open")
+    # A ação vem escrita, e não só na seta, e troca ao abrir
+    assert pagina.locator("#res-ajustes .ajustes-rotulo-fechado").is_visible()
+    assert not pagina.locator("#res-ajustes .ajustes-rotulo-aberto").is_visible()
     pagina.locator("#res-ajustes summary").click()
     cartao = pagina.locator("#res-cabecalho-card")
     cartao.wait_for(state="visible", timeout=PRAZO_CONVERSAO_MS)
+    assert pagina.locator("#res-ajustes .ajustes-rotulo-aberto").is_visible()
+    assert not pagina.locator("#res-ajustes .ajustes-rotulo-fechado").is_visible()
     assert "3 parágrafos vêm antes do item 1" in cartao.inner_text()
 
     # O resumo da conversão fica só para o leitor de tela (o quadro do resultado já diz o
