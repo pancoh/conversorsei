@@ -5,6 +5,9 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+- **"Colar texto" sem nada copiado abre o campo para colar.** Antes, o botão só avisava
+  que a área de transferência estava vazia.
+
 ## 0.7.5 (2026-10-08)
 
 - **Caixa "Revisar ajustes do documento" mais visível.** Ganhou fundo azul claro, ícone e

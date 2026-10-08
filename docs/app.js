@@ -598,8 +598,9 @@ document.addEventListener('paste', (e) => {
 
 // O botão lê a área de transferência direto. Cada navegador pede uma confirmação: o
 // Chrome, a permissão na primeira vez; o Safari e o Firefox, um toque em "Colar" a cada
-// leitura. Recusada ou sem o recurso, o botão abre um campo, e colar nele (Ctrl+V, ou
-// tocar e segurar no celular) converte na hora. O Converter do campo é para o texto digitado
+// leitura (a bolha é do navegador, e a página não tem como dispensá-la). Recusada, sem o
+// recurso ou sem texto copiado, o botão abre um campo, e colar nele (Ctrl+V, ou tocar e
+// segurar no celular) converte na hora. O Converter do campo é para o texto digitado
 btnColar.addEventListener('click', async (e) => {
   e.preventDefault();
   if (!isPyodideReady) {
@@ -621,7 +622,7 @@ btnColar.addEventListener('click', async (e) => {
   if (colado) {
     novaSelecao([colado]);
   } else {
-    showToast('A área de transferência não tem texto para converter.');
+    mostrarCampoDeColar(true);
   }
 });
 

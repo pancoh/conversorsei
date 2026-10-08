@@ -497,6 +497,13 @@ def test_texto_colado_converte_como_um_arquivo(contexto: object, endereco: str) 
     pagina.evaluate(COLAR, ["#campo-qualquer", {"text/plain": "20"}])
     assert pagina.evaluate("() => numeroDaSelecao") == selecao
 
+    # Sem texto na área de transferência, o botão abre o campo, e outro clique o fecha
+    pagina.evaluate("() => { navigator.clipboard.read = () => Promise.resolve([]); }")
+    pagina.click("#btn-colar")
+    pagina.locator("#colar-campo").wait_for(state="visible")
+    pagina.click("#btn-colar")
+    assert pagina.locator("#colar-painel").is_hidden()
+
     # Sem a leitura liberada, o botão abre o campo, e colar nele converte e o fecha
     pagina.evaluate("() => { navigator.clipboard.read = () => Promise.reject(new DOMException('', 'NotAllowedError')); }")
     pagina.click("#btn-colar")
