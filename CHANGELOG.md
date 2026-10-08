@@ -5,6 +5,8 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+## 0.7.2 (2026-10-08)
+
 - **Tabelas grandes sem travar.** Uma tabela de mil linhas em Markdown, LibreOffice, HTML ou
   PDF levava cerca de 28 segundos e congelava a página. Agora leva menos de um segundo, como
   no Word.
