@@ -177,7 +177,7 @@ registrados.
 ## <img src=".github/readme/apoio.svg" width="24" height="24" alt=""> Apoie o projeto
 
 O Conversor SEI é gratuito. Se ele ajuda no seu trabalho, você pode apoiar pelo link
-**Apoie este projeto**, no rodapé da página (Pix).
+**Apoie este projeto**, no rodapé da página (PIX).
 
 ## <img src=".github/readme/licenca.svg" width="24" height="24" alt=""> Licença
 
