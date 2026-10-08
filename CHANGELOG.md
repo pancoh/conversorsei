@@ -9,6 +9,10 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
   Word, proporcional à página: a foto na largura toda fica com cerca de 800 px no SEI, e a
   altura acompanha. Antes, a foto aparecia no tamanho original, muito maior que a página, e
   precisava ser reduzida à mão. A imagem nunca é ampliada além do tamanho original.
+- **Colunas de tabela pelo conteúdo.** Quando todas as colunas têm a mesma largura (o padrão
+  do Word e de toda tabela vinda de Markdown, ODT, HTML ou PDF), a largura de cada uma passa
+  a ser calculada pelo texto: uma coluna só com os números 1, 2, 3 fica estreita, e as de
+  texto longo ficam largas. Larguras ajustadas no Word continuam como estão.
 
 ## 0.6.0 (2026-10-08)
 

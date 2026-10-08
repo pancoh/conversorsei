@@ -930,6 +930,70 @@ def larguras_percentuais(tbl: Table) -> list[float]:
         return []
 
 
+# Largura da área de texto do SEI em caracteres de tabela, para o cálculo pelo conteúdo:
+# cerca de 800 px de largura, a uns 7 px por caractere em Calibri de 11 pt
+CARACTERES_NA_LARGURA_DA_TABELA = 110
+# Espaço da borda e do recuo da célula, contado como caracteres em cada coluna
+FOLGA_DA_CELULA = 2
+LARGURA_MINIMA_DA_COLUNA_PCT = 5.0
+
+
+def colunas_iguais(pct: list[float]) -> bool:
+    """Diz se as colunas têm todas a mesma largura, o padrão que ninguém escolheu.
+
+    É assim que o Word insere uma tabela, e é assim que sai a tabela montada do Markdown,
+    do ODT, do HTML e do PDF, que não trazem largura de coluna. Copiada como está, uma
+    coluna só com os números 1, 2, 3 ocupava um terço da tabela. Larguras diferentes foram
+    ajustadas por quem escreveu, e ficam.
+    """
+    return len(pct) > 1 and max(pct) - min(pct) <= 1
+
+
+def larguras_pelo_conteudo(linhas: list[list[dict[str, Any]]], colunas: int) -> list[float]:
+    """Largura de cada coluna em %, calculada pelo texto das células, como faz o navegador.
+
+    Cada coluna tem um mínimo (a maior palavra, para não partir palavra) e um desejado (a
+    maior linha de texto de uma célula). Se os desejados cabem na largura, a tabela se
+    divide na proporção deles; se não cabem, cada coluna recebe o mínimo e o que sobra vai
+    para as colunas de texto longo, na proporção do que lhes falta. Célula que ocupa várias
+    colunas não entra na medida. Nenhuma coluna fica abaixo de 5%.
+    """
+    minimo = [1] * colunas
+    desejado = [1] * colunas
+    for linha in linhas:
+        for cel in linha:
+            if cel["colspan"] != 1 or cel["gridcol"] >= colunas:
+                continue
+            texto = re.sub(r"<br\s*/?>|</p>", "\n", cel["html"])
+            texto = htmlmod.unescape(re.sub(r"<[^>]+>", "", texto)).replace("\xa0", " ")
+            linhas_do_texto = [t.strip() for t in texto.split("\n") if t.strip()]
+            palavras = [len(w) for t in linhas_do_texto for w in t.split()]
+            c = cel["gridcol"]
+            minimo[c] = max(minimo[c], *palavras, 1)
+            desejado[c] = max(desejado[c], *(len(t) for t in linhas_do_texto), 1)
+    minimo = [m + FOLGA_DA_CELULA for m in minimo]
+    desejado = [d + FOLGA_DA_CELULA for d in desejado]
+
+    capacidade = CARACTERES_NA_LARGURA_DA_TABELA
+    if sum(desejado) <= capacidade or sum(minimo) >= capacidade:
+        base = [float(d) if sum(desejado) <= capacidade else float(m) for d, m in zip(desejado, minimo, strict=True)]
+    else:
+        falta = [d - m for d, m in zip(desejado, minimo, strict=True)]
+        sobra = capacidade - sum(minimo)
+        base = [m + sobra * f / sum(falta) for m, f in zip(minimo, falta, strict=True)]
+
+    pct = [100 * b / sum(base) for b in base]
+    # O piso tira largura das colunas maiores, na proporção delas
+    estreitas = [p < LARGURA_MINIMA_DA_COLUNA_PCT for p in pct]
+    if any(estreitas) and not all(estreitas):
+        resto = 100 - LARGURA_MINIMA_DA_COLUNA_PCT * sum(estreitas)
+        largas = sum(p for p, e in zip(pct, estreitas, strict=True) if not e)
+        pct = [LARGURA_MINIMA_DA_COLUNA_PCT if e else p * resto / largas for p, e in zip(pct, estreitas, strict=True)]
+    pct = [round(p, 1) for p in pct]
+    pct[-1] = round(100 - sum(pct[:-1]), 1)
+    return pct
+
+
 def celula_para_html(doc: DocumentoWord, tc, r: int, tbl: Table, max_nivel: int = MAX_NIVEL_PADRAO) -> str:
     """Conteúdo de uma célula: parágrafos e tabelas aninhadas."""
     out = []
@@ -1040,14 +1104,18 @@ def converter_tabela(
                 "html": celula_para_html(doc, tc, r, tbl, max_nivel=max_nivel),
                 "header": (r == 0),
             }
-            if pct and r == 0:
-                w = sum(pct[gc : gc + span])
-                cel["width"] = round(w, 1)
             emitidas[gc] = cel
             linha.append(cel)
             gc += span
         if linha:
             linhas_html.append(linha)
+
+    if colunas_iguais(pct):
+        pct = larguras_pelo_conteudo(linhas_html, len(pct))
+    # A largura vai só na primeira linha, que fixa as colunas da tabela inteira
+    for cel in (c for linha in linhas_html for c in linha if c["row"] == 0):
+        if pct:
+            cel["width"] = round(sum(pct[cel["gridcol"] : cel["gridcol"] + cel["colspan"]]), 1)
 
     linhas_td_html = []
     for linha in linhas_html:

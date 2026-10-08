@@ -487,6 +487,52 @@ def test_dimensoes_em_pixels_le_png_gif_e_jpeg():
     assert dimensoes_em_pixels(b"formato desconhecido") is None
 
 
+
+def _larguras_das_colunas(linhas: list[list[str]], grade_twips: list[int] | None = None) -> list[float]:
+    """Converte uma tabela com estas células e devolve o width de cada coluna da primeira linha."""
+    doc = docx.Document()
+    tabela = doc.add_table(rows=len(linhas), cols=len(linhas[0]))
+    for r, linha in enumerate(linhas):
+        for c, texto in enumerate(linha):
+            tabela.cell(r, c).text = texto
+    if grade_twips:
+        for coluna, largura in zip(tabela._tbl.tblGrid.findall(qn("w:gridCol")), grade_twips, strict=True):
+            coluna.set(qn("w:w"), str(largura))
+    html = next(b for b in converter_docx_para_blocos(_salvar_em_memoria(doc)) if b.startswith("<table"))
+    primeira = re.search(r"<tr>.*?</tr>", html, re.DOTALL).group(0)
+    return [float(w) for w in re.findall(r'<td width="([\d.]+)%"', primeira)]
+
+
+TABELA_COM_NUMEROS = [
+    ["Nº", "Recomendação", "Situação"],
+    ["1", "Publicar os dados de acompanhamento das obras no portal do programa.", "Mantida."],
+    ["2", "Padronizar a identificação dos empreendimentos entre os sistemas.", "Atendida em parte."],
+]
+
+
+def test_colunas_iguais_ganham_largura_pelo_conteudo():
+    """Colunas iguais (o padrão do Word e de toda tabela vinda de Markdown, ODT, HTML e PDF).
+
+    Copiadas como estavam, a coluna só com 1, 2, 3 ocupava um terço da tabela.
+    """
+    numero, texto, situacao = _larguras_das_colunas(TABELA_COM_NUMEROS)
+    assert 5 <= numero <= 8
+    assert texto > situacao > numero
+    assert round(numero + texto + situacao, 1) == 100
+
+
+def test_larguras_ajustadas_no_word_sao_mantidas():
+    assert _larguras_das_colunas(TABELA_COM_NUMEROS, grade_twips=[3000, 3000, 2000]) == [37.5, 37.5, 25.0]
+
+
+def test_largura_pelo_conteudo_nao_parte_palavra_longa():
+    """Com texto demais para a largura, cada coluna guarda ao menos a maior palavra."""
+    longo = "texto corrido " * 30
+    numero, _, _ = _larguras_das_colunas([["Item", longo, longo], ["(SEGES/MGI)", longo, longo]])
+    # "(SEGES/MGI)" e a folga da célula: 13 de 110 caracteres
+    assert numero >= 11
+
+
 def _salvar_em_memoria(doc) -> bytes:
     saida = io.BytesIO()
     doc.save(saida)
