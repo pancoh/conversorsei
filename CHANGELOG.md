@@ -5,6 +5,8 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+## 0.7.0 (2026-10-08)
+
 - **Travessões preservados.** O travessão e a meia-risca ficam no texto em todos os formatos,
   como já ficavam no Word. Antes, nos outros formatos, o travessão virava vírgula e a
   meia-risca sumia: "2020–2023" saía "20202023".
