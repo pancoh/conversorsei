@@ -380,3 +380,42 @@ def test_watch_conserva_subpastas_e_controla_colisoes(tmp_path, monkeypatch, cap
         assert f'Documento {pasta}.' in (saida / pasta / 'nota_SEI.html').read_text(encoding='utf-8')
     assert 'coincide' in capsys.readouterr().err
     assert not (saida / 'nota_SEI.html').exists()
+
+
+def test_watch_libera_o_nome_de_um_arquivo_apagado(tmp_path, monkeypatch, capsys):
+    """Apagado o a.md, o a.txt criado depois usa a mesma saída sem reiniciar o watch."""
+    import conversorsei.cli as cli
+
+    entrada = tmp_path / "entrada"
+    entrada.mkdir()
+    (entrada / "a.md").write_text("Primeiro.", encoding="utf-8")
+    saida = tmp_path / "saida"
+    chamadas = {"n": 0}
+
+    def falso_sleep(_segundos):
+        chamadas["n"] += 1
+        if chamadas["n"] == 2:
+            (entrada / "a.md").unlink()
+            (entrada / "a.txt").write_text("Segundo.", encoding="utf-8")
+        if chamadas["n"] >= 4:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli.time, "sleep", falso_sleep)
+    assert main([str(entrada), "--watch", "-o", str(saida)]) == 0
+
+    capturado = capsys.readouterr()
+    assert "a.txt ->" in capturado.out
+    assert "FALHA" not in capturado.err
+    assert "Segundo." in (saida / "a_SEI.html").read_text(encoding="utf-8")
+
+
+def test_saida_coincidente_orienta_sem_sugerir_saida(tmp_path, capsys):
+    """O --saida não vale para o lote: a mensagem manda renomear ou separar as pastas."""
+    (tmp_path / "nota.md").write_text("Um.", encoding="utf-8")
+    (tmp_path / "nota.txt").write_text("Dois.", encoding="utf-8")
+
+    assert main([str(tmp_path), "-o", str(tmp_path / "saida")]) == 1
+    saida = capsys.readouterr().out
+    assert "coincide com a de nota.md" in saida
+    assert "Renomeie um dos dois documentos" in saida
+    assert "--saida" not in saida

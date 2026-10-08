@@ -708,8 +708,15 @@ def blocos_das_notas(doc: DocumentoWord) -> list[str]:
     ]
 
 
-def run_para_html(doc: DocumentoWord, run_el, p: Paragraph, estilos_do_paragrafo: list | None = None) -> str:
-    """Converte um <w:r> em HTML inline (negrito, itálico, imagens Base64, etc.)."""
+def run_para_html(
+    doc: DocumentoWord, run_el, p: Paragraph, estilos_do_paragrafo: list | None = None, em_link: bool = False
+) -> str:
+    """Converte um <w:r> em HTML inline (negrito, itálico, imagens Base64, etc.).
+
+    `em_link` diz que o run está dentro de um w:hyperlink: o sublinhado e a cor do link
+    (o estilo Hyperlink do Word) ficam de fora, porque quem desenha o link é o editor do
+    SEI, como no link vindo do Markdown, do ODT e do HTML.
+    """
     from docx.text.run import Run
 
     run = Run(run_el, p)
@@ -742,12 +749,17 @@ def run_para_html(doc: DocumentoWord, run_el, p: Paragraph, estilos_do_paragrafo
         if estilos_do_paragrafo is None:
             estilos_do_paragrafo = _estilos_do_paragrafo(p)
         fontes = _fontes_do_run(run, estilos_do_paragrafo)
-        b = _primeiro_definido(fontes, lambda f: f.bold)
-        i = _primeiro_definido(fontes, lambda f: f.italic)
-        u = _primeiro_definido(fontes, lambda f: f.underline)
+        # Negrito, itálico e sublinhado vêm do run e do estilo de caractere, e não do estilo
+        # do parágrafo: esse define a classe (Título vira Item_Nivel, Citação vira Citação),
+        # e a classe já tem a aparência. Lido dele, o Título 1 saía em <strong> e a citação
+        # em <em>, por cima do estilo do SEI
+        do_trecho = _fontes_do_run(run, [])
+        b = _primeiro_definido(do_trecho, lambda f: f.bold)
+        i = _primeiro_definido(do_trecho, lambda f: f.italic)
+        u = not em_link and _primeiro_definido(do_trecho, lambda f: f.underline)
         strike = bool(_primeiro_definido(fontes, lambda f: f.strike))
         cor = None
-        if rPr is not None:
+        if rPr is not None and not em_link:
             c = rPr.find(qn("w:color"))
             if c is not None:
                 val = c.get(qn("w:val"))
@@ -790,7 +802,7 @@ def paragrafo_inline(doc: DocumentoWord, p: Paragraph) -> str:
                     href = endereco_seguro(p.part.rels[rid].target_ref)
                 except Exception:
                     href = None
-            inner = "".join(run_para_html(doc, r, p, estilos) for r in child.findall(qn("w:r")))
+            inner = "".join(run_para_html(doc, r, p, estilos, em_link=True) for r in child.findall(qn("w:r")))
             if href:
                 out.append(f'<a href="{htmlmod.escape(href)}">{inner}</a>')
             else:

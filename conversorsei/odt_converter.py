@@ -29,6 +29,7 @@ from conversorsei.formatacao import (
 )
 from conversorsei.md_converter import (
     MARCA_QUEBRA_ODT,
+    colunas_mescladas,
     comeca_com_item,
     converter_texto_md_para_blocos,
     desescapar_markdown,
@@ -383,43 +384,90 @@ def texto_do_no(
     return "".join(partes)
 
 
-def _linha_de_tabela(
-    linha: ElementTree.Element, estilos: dict[str, FormatoTrecho], notas: list[tuple[str, str]] | None = None
-) -> str:
-    celulas = []
+# Repetição de células e linhas iguais (number-columns-repeated, number-rows-repeated). O
+# LibreOffice completa a linha com uma célula vazia repetida até o fim da grade, e uma
+# tabela vinda do Calc chega a repetir mil colunas: expandida, ela travava a conversão. A
+# célula vazia repetida no fim da linha e a linha vazia repetida no fim da tabela saem. O
+# que a repetição acrescenta, além disso, tem teto; o conteúdo escrito de fato nunca é cortado
+LIMITE_COLUNAS_REPETIDAS = 32
+LIMITE_LINHAS_REPETIDAS = 200
+AVISO_REPETICAO = (
+    "Uma tabela do ODT repetia células ou linhas demais, e a repetição foi cortada. "
+    "Confira a tabela com o original."
+)
+
+
+def _inteiro(no: ElementTree.Element, atributo: str) -> int:
+    """Atributo numérico de tabela (repetição, mescla), 1 quando ausente ou inválido.
+
+    Um valor que não é número derrubava a conversão inteira.
+    """
+    try:
+        return max(1, int(no.get(_q("table", atributo)) or 1))
+    except ValueError:
+        return 1
+
+
+def _celulas_da_linha(
+    linha: ElementTree.Element,
+    estilos: dict[str, FormatoTrecho],
+    notas: list[tuple[str, str]] | None,
+    cortes: list[bool],
+) -> list[str]:
+    """Células da linha em Markdown, com a repetição expandida dentro do teto."""
+    lidas: list[tuple[str, str, int]] = []
     for celula in linha.findall(_q("table", "table-cell")):
         textos = [texto_do_no(p, estilos, notas).strip() for p in celula.findall(_q("text", "p"))]
         # A barra vertical é o separador da tabela Markdown e não pode vir do conteúdo
         texto = " ".join(t for t in textos if t).replace("|", r"\|")
-        celulas.extend(
-            [marcar_colunas_mescladas(texto, _colunas_da_celula(celula))]
-            * int(celula.get(_q("table", "number-columns-repeated")) or 1)
-        )
-    return "| " + " | ".join(celulas) + " |"
+        marcada = marcar_colunas_mescladas(texto, _colunas_da_celula(celula))
+        lidas.append((texto, marcada, _inteiro(celula, "number-columns-repeated")))
+    while lidas and lidas[-1][2] > 1 and not lidas[-1][0]:
+        lidas.pop()
+    celulas: list[str] = []
+    for _, marcada, vezes in lidas:
+        celulas.append(marcada)
+        extras = min(vezes - 1, max(0, LIMITE_COLUNAS_REPETIDAS - len(celulas)))
+        if extras < vezes - 1:
+            cortes.append(True)
+        celulas.extend([marcada] * extras)
+    return celulas
 
 
 def _colunas_da_celula(celula: ElementTree.Element) -> int:
-    return int(celula.get(_q("table", "number-columns-spanned")) or 1)
+    return _inteiro(celula, "number-columns-spanned")
 
 
 def tabela_para_markdown(
-    tabela: ElementTree.Element, estilos: dict[str, FormatoTrecho], notas: list[tuple[str, str]] | None = None
+    tabela: ElementTree.Element,
+    estilos: dict[str, FormatoTrecho],
+    notas: list[tuple[str, str]] | None = None,
+    avisos: list[str] | None = None,
 ) -> list[str]:
     """Converte uma table:table em linhas de tabela Markdown."""
-    linhas = tabela.findall(_q("table", "table-row"))
+    cortes: list[bool] = []
+    lidas = [
+        (_celulas_da_linha(linha, estilos, notas, cortes), _inteiro(linha, "number-rows-repeated"))
+        for linha in tabela.findall(_q("table", "table-row"))
+    ]
+    while lidas and lidas[-1][1] > 1 and not any(colunas_mescladas(c)[1] for c in lidas[-1][0]):
+        lidas.pop()
+    linhas: list[list[str]] = []
+    for celulas, vezes in lidas:
+        linhas.append(celulas)
+        extras = min(vezes - 1, max(0, LIMITE_LINHAS_REPETIDAS - len(linhas)))
+        if extras < vezes - 1:
+            cortes.append(True)
+        linhas.extend([celulas] * extras)
     if not linhas:
         return []
+    if cortes and avisos is not None and AVISO_REPETICAO not in avisos:
+        avisos.append(AVISO_REPETICAO)
 
-    saida = [_linha_de_tabela(linhas[0], estilos, notas)]
-    # Contadas no XML, e não no texto gerado: ali um "\|" do conteúdo pareceria coluna
-    colunas = sum(
-        _colunas_da_celula(celula) * int(celula.get(_q("table", "number-columns-repeated")) or 1)
-        for celula in linhas[0].findall(_q("table", "table-cell"))
-    )
-    saida.append("| " + " | ".join(["---"] * max(colunas, 1)) + " |")
-    for indice, linha in enumerate(linhas):
-        repeticoes = int(linha.get(_q("table", "number-rows-repeated")) or 1) - (indice == 0)
-        saida.extend(_linha_de_tabela(linha, estilos, notas) for _ in range(repeticoes))
+    # Contadas nas células, e não no texto gerado: ali um "\|" do conteúdo pareceria coluna
+    colunas = max(sum(colunas_mescladas(c)[0] for c in celulas) for celulas in linhas)
+    saida = ["| " + " | ".join(linhas[0]) + " |", "| " + " | ".join(["---"] * max(colunas, 1)) + " |"]
+    saida.extend("| " + " | ".join(celulas) + " |" for celulas in linhas[1:])
     return saida
 
 
@@ -537,6 +585,7 @@ def converter_corpo(
     citacao: CitacaoPorRecuo | None = None,
     notas: list[tuple[str, str]] | None = None,
     listas: dict[str, dict[int, NumeracaoDaLista]] | None = None,
+    avisos: list[str] | None = None,
 ) -> list[str]:
     """Percorre o corpo do documento devolvendo linhas de Markdown.
 
@@ -648,7 +697,7 @@ def converter_corpo(
                 registrar(candidata, formato, texto, visivel if sem_classe and linha_curta(visivel) else None)
             linhas.append("")
         elif tag == _q("table", "table"):
-            md_tabela = tabela_para_markdown(filho, estilos, notas)
+            md_tabela = tabela_para_markdown(filho, estilos, notas, avisos)
             if md_tabela:
                 linhas.extend(md_tabela)
                 registrar()
@@ -678,7 +727,7 @@ def extrair_markdown_odt(
     if avisos is not None and any(True for _ in raiz.iter(_q("draw", "image"))):
         avisos.append("Imagens do ODT não foram incorporadas. Insira-as no SEI após conferir o original.")
     if avisos is not None and any(
-        int(celula.get(_q("table", "number-rows-spanned")) or 1) > 1
+        _inteiro(celula, "number-rows-spanned") > 1
         for celula in raiz.iter(_q("table", "table-cell"))
     ):
         avisos.append("Uma tabela tem células mescladas entre linhas. Confira a tabela no resultado e no SEI.")
@@ -699,7 +748,7 @@ def extrair_markdown_odt(
     notas: list[tuple[str, str]] = []
     listas = mapear_listas(raiz, raiz_estilos)
     markdown = "\n".join(
-        converter_corpo(corpo, estilos, heranca, formatos, heranca_completa, citacao, notas, listas)
+        converter_corpo(corpo, estilos, heranca, formatos, heranca_completa, citacao, notas, listas, avisos)
     )
     if notas:
         if avisos is not None:

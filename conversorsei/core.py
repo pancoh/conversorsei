@@ -275,12 +275,16 @@ def converter_documento(
     destino = saida_base.resolve()
     origem = p_in.resolve()
     outra_origem = (destinos_reservados or {}).get(destino)
-    if destino == origem or (outra_origem is not None and outra_origem != origem):
+    if destino == origem:
+        resultado.sucesso = False
+        resultado.erros.append(f"A saída {saida_base} é o próprio arquivo de entrada. Escolha outro nome.")
+        return resultado
+    if outra_origem is not None and outra_origem != origem:
+        # O --saida não serve ao lote nem ao watch: a orientação é a que vale nos dois
         resultado.sucesso = False
         resultado.erros.append(
-            f"A saída {saida_base} coincide com "
-            + ("o arquivo de entrada. " if destino == origem else f"a saída de {outra_origem}. ")
-            + "Use --saida para escolher outro nome ou converta para outra pasta."
+            f"A saída {saida_base} coincide com a de {outra_origem.name}. "
+            "Renomeie um dos dois documentos ou converta-os para pastas diferentes."
         )
         return resultado
     saida_base.parent.mkdir(parents=True, exist_ok=True)

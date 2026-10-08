@@ -802,3 +802,63 @@ def test_estilo_de_caractere_preserva_enfase_e_respeita_desativacao(propriedade,
     corpo = '\n'.join(converter_docx_para_blocos(buffer.getvalue()))
     assert f'<{tag}>Herdado</{tag}>' in corpo
     assert f'<{tag}> Desligado</{tag}>' not in corpo
+
+
+def test_docx_enfase_do_estilo_do_paragrafo_nao_vai_para_o_texto():
+    """A classe já dá a aparência: Título 1 não ganha <strong>, Citação não ganha <em>.
+
+    A ênfase do estilo de caractere, essa sim, vai para o texto.
+    """
+    from docx.enum.style import WD_STYLE_TYPE
+
+    from conversorsei.core import converter_bytes
+
+    doc = docx.Document()
+    doc.add_heading("Introdução", 1)
+    doc.add_paragraph("Citação longa de um autor.", style="Quote")
+    destaque = doc.styles.add_style("Destaque", WD_STYLE_TYPE.CHARACTER)
+    destaque.font.bold = True
+    p = doc.add_paragraph("Texto com ")
+    p.add_run("negrito por estilo", style="Destaque")
+    buffer = io.BytesIO()
+    doc.save(buffer)
+
+    paragrafos = re.findall(r'<p class="[^"]+">.*?</p>', converter_bytes("e.docx", buffer.getvalue()).arquivos[0].conteudo)
+    assert paragrafos == [
+        '<p class="Item_Nivel1">Introdução</p>',
+        '<p class="Citação">Citação longa de um autor.</p>',
+        '<p class="Texto_Justificado">Texto com <strong>negrito por estilo</strong></p>',
+    ]
+
+
+def test_docx_link_com_estilo_hyperlink_sai_sem_sublinhado_nem_cor():
+    """Como o link do Markdown, do ODT e do HTML: quem desenha o link é o editor do SEI."""
+    from docx.enum.dml import MSO_THEME_COLOR
+    from docx.enum.style import WD_STYLE_TYPE
+    from docx.opc.constants import RELATIONSHIP_TYPE
+
+    doc = docx.Document()
+    estilo = doc.styles.add_style("Hyperlink", WD_STYLE_TYPE.CHARACTER)
+    estilo.font.underline = True
+    estilo.font.color.theme_color = MSO_THEME_COLOR.HYPERLINK
+    p = doc.add_paragraph("Veja ")
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), p.part.relate_to("https://gov.br", RELATIONSHIP_TYPE.HYPERLINK, is_external=True))
+    run = OxmlElement("w:r")
+    rpr = OxmlElement("w:rPr")
+    rstyle = OxmlElement("w:rStyle")
+    rstyle.set(qn("w:val"), "Hyperlink")
+    rpr.append(rstyle)
+    cor = OxmlElement("w:color")
+    cor.set(qn("w:val"), "0563C1")
+    rpr.append(cor)
+    run.append(rpr)
+    texto = OxmlElement("w:t")
+    texto.text = "o portal"
+    run.append(texto)
+    link.append(run)
+    p._p.append(link)
+    buffer = io.BytesIO()
+    doc.save(buffer)
+
+    assert 'Veja <a href="https://gov.br">o portal</a>' in converter_docx_para_html(buffer.getvalue())

@@ -206,3 +206,27 @@ def test_txt_mantem_a_barra_invertida_do_texto():
     html = res.arquivos[0].conteudo
     assert "Pasta C:\\dados\\(2026), regex \\d+\\. e ~~nada~~ riscado." in html
     assert "&gt; resposta citada" in html
+
+
+def test_tabela_grande_nao_usa_table_cell(monkeypatch):
+    """table.cell() remonta a grade inteira a cada chamada: com ele, 1.000 linhas levavam 28 s.
+
+    A montagem lê as células de cada linha uma vez. Células mescladas continuam certas.
+    """
+    import docx.table
+
+    from conversorsei.core import converter_bytes
+    from conversorsei.md_converter import marcar_colunas_mescladas
+
+    def proibido(*args, **kwargs):
+        raise AssertionError("table.cell() não deve ser usado na montagem da tabela")
+
+    monkeypatch.setattr(docx.table.Table, "cell", proibido)
+    linhas = "".join(f"| linha {i} | valor {i} | x |\n" for i in range(300))
+    mesclada = marcar_colunas_mescladas("junta", 2)
+    md = f"| A | B | C |\n|---|---|---|\n| {mesclada} | só |\n{linhas}"
+    res = converter_bytes("grande.md", md.encode())
+    assert res.sucesso, res.erros
+    html = res.arquivos[0].conteudo
+    assert html.count("<tr>") == 302
+    assert 'colspan="2"' in html and "valor 299" in html

@@ -5,6 +5,20 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+- **Tabelas grandes sem travar.** Uma tabela de mil linhas em Markdown, LibreOffice, HTML ou
+  PDF levava cerca de 28 segundos e congelava a página. Agora leva menos de um segundo, como
+  no Word.
+- **Repetição de células no LibreOffice.** As células e linhas vazias que o LibreOffice repete
+  no fim da tabela saem do resultado, e o que a repetição acrescenta tem limite, com aviso. Um
+  valor inválido nesse atributo deixa de interromper a conversão.
+- **Títulos e citações do Word.** O negrito e o itálico do estilo do parágrafo voltam a ficar
+  com a classe do SEI: desde a 0.7.1, o Título 1 saía com negrito no texto e a citação, em
+  itálico. A ênfase do estilo de caractere continua no texto.
+- **Links do Word.** O link sai sem o sublinhado e a cor do estilo do Word, como os links dos
+  outros formatos.
+- **Modo watch.** Apagado ou renomeado um documento, o nome da saída dele fica livre de novo.
+  A mensagem de saídas coincidentes passa a orientar renomear ou separar as pastas.
+
 ## 0.7.1 (2026-10-08)
 
 - **Saída em lote protegida.** Na linha de comando, documentos que gerariam o mesmo arquivo

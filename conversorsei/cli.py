@@ -146,6 +146,11 @@ def observar(args: argparse.Namespace, alvos: list[str], outdir: Path | None, va
 
     try:
         while True:
+            # O nome de saída de um arquivo apagado ou renomeado fica livre: sem isto, um
+            # a.txt criado depois de apagar o a.md seria recusado até reiniciar o watch
+            for destino, origem in list(destinos_reservados.items()):
+                if not origem.exists():
+                    del destinos_reservados[destino]
             for caminho in ciclo_de_observacao(alvos, args.recursivo, convertidos, pendentes):
                 res = converter_documento(
                     caminho_entrada=caminho,

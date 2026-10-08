@@ -774,15 +774,18 @@ def montar_docx_de_markdown(conteudo: str, estendido: bool = True, extraido: boo
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
                 aplicar_bordas_tabela(table)
 
-                for r_idx, row_cells in enumerate(table_data):
+                # As células de cada linha são lidas uma vez, antes das fusões. table.cell()
+                # remonta a grade da tabela inteira a cada chamada: numa tabela de 1.000
+                # linhas, a conversão levava 28 s, e a aba do navegador congelava
+                for r_idx, (linha_docx, row_cells) in enumerate(zip(table.rows, table_data, strict=True)):
                     is_header = r_idx == 0
+                    celulas_docx = linha_docx.cells
                     coluna = 0
                     for celula in row_cells:
                         largura, cell_text = colunas_mescladas(celula)
-                        c_idx = coluna
-                        cell = table.cell(r_idx, c_idx)
+                        cell = celulas_docx[coluna]
                         if largura > 1:
-                            cell = cell.merge(table.cell(r_idx, c_idx + largura - 1))
+                            cell = cell.merge(celulas_docx[coluna + largura - 1])
                         definir_margens_celula(cell, top=120, bottom=120, left=150, right=150)
                         if is_header:
                             definir_fundo_celula(cell, "E6E6E6")
@@ -796,7 +799,7 @@ def montar_docx_de_markdown(conteudo: str, estendido: bool = True, extraido: boo
                         coluna += largura
                     # Linhas incompletas ainda recebem a largura da tabela.
                     for c_idx in range(coluna, cols_cnt):
-                        cell = table.cell(r_idx, c_idx)
+                        cell = celulas_docx[c_idx]
                         definir_margens_celula(cell, top=120, bottom=120, left=150, right=150)
                         if is_header:
                             definir_fundo_celula(cell, "E6E6E6")

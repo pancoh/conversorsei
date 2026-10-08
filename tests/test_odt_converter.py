@@ -233,3 +233,55 @@ def test_odt_preserva_barra_invertida_antes_de_pontuacao(tmp_path):
     res = converter_documento(_odt(tmp_path, conteudo), outdir=tmp_path / 'saida')
     assert res.sucesso, res.erros
     assert texto in res.arquivos_gerados[0].read_text(encoding='utf-8')
+
+
+def _tabela_repetida(tmp_path: Path, linha_extra: str) -> tuple:
+    tabela = (
+        "<table:table><table:table-row>"
+        "<table:table-cell><text:p>Nome</text:p></table:table-cell>"
+        '<table:table-cell table:number-columns-repeated="1020"/>'
+        f"</table:table-row>{linha_extra}</table:table>"
+    )
+    inicio = CONTENT_XML.index("   <table:table>")
+    fim = CONTENT_XML.index("   </table:table>", inicio) + len("   </table:table>")
+    res = converter_documento(_odt(tmp_path, CONTENT_XML[:inicio] + tabela + CONTENT_XML[fim:]), outdir=tmp_path / "s")
+    assert res.sucesso, res.erros
+    return res, res.arquivos_gerados[0].read_text(encoding="utf-8")
+
+
+def test_odt_repeticao_vazia_no_fim_sai_da_tabela(tmp_path):
+    """O LibreOffice completa a linha com uma célula vazia repetida até o fim da grade.
+
+    Expandidas, as mil colunas do Calc e o milhão de linhas vazias travavam a conversão.
+    """
+    vazias = '<table:table-row table:number-rows-repeated="1000000"><table:table-cell/></table:table-row>'
+    res, html = _tabela_repetida(tmp_path, vazias)
+    assert html.count("<tr>") == 1
+    assert html.count("<td ") == 1
+    assert not any("repetição" in aviso for aviso in res.avisos)
+
+
+def test_odt_repeticao_com_texto_tem_teto_e_aviso(tmp_path):
+    from conversorsei.odt_converter import LIMITE_COLUNAS_REPETIDAS, LIMITE_LINHAS_REPETIDAS
+
+    linhas = (
+        '<table:table-row table:number-rows-repeated="1000000">'
+        '<table:table-cell table:number-columns-repeated="500"><text:p>x</text:p></table:table-cell>'
+        "</table:table-row>"
+    )
+    res, html = _tabela_repetida(tmp_path, linhas)
+    assert html.count("<tr>") == LIMITE_LINHAS_REPETIDAS
+    # O Markdown completa toda linha até a largura da maior
+    assert html.count("<td ") == LIMITE_LINHAS_REPETIDAS * LIMITE_COLUNAS_REPETIDAS
+    assert any("repetição foi cortada" in aviso for aviso in res.avisos)
+
+
+def test_odt_atributo_de_tabela_invalido_nao_derruba_a_conversao(tmp_path):
+    conteudo = CONTENT_XML.replace(
+        "<table:table-cell><text:p>Parametro",
+        '<table:table-cell table:number-columns-repeated="abc" table:number-rows-spanned="x"><text:p>Parametro',
+        1,
+    )
+    res = converter_documento(_odt(tmp_path, conteudo), outdir=tmp_path / "saida")
+    assert res.sucesso, res.erros
+    assert "Parametro" in res.arquivos_gerados[0].read_text(encoding="utf-8")
