@@ -194,3 +194,15 @@ def test_md_marcador_mais_vira_item_de_lista(tmp_path):
     html = converter_md_para_html(md_file)
     assert '<li class="Texto_Justificado">primeiro</li>' in html
     assert "+" not in html
+
+
+def test_txt_mantem_a_barra_invertida_do_texto():
+    """No .txt a barra é caractere, como no texto extraído de HTML, ODT e PDF."""
+    from conversorsei.core import converter_bytes
+
+    texto = "Pasta C:\\dados\\(2026), regex \\d+\\. e ~~nada~~ riscado.\n> resposta citada\n"
+    res = converter_bytes("nota.txt", texto.encode())
+    assert res.sucesso, res.erros
+    html = res.arquivos[0].conteudo
+    assert "Pasta C:\\dados\\(2026), regex \\d+\\. e ~~nada~~ riscado." in html
+    assert "&gt; resposta citada" in html

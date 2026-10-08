@@ -781,3 +781,24 @@ def test_docx_notas_de_rodape_vao_para_o_fim_como_no_odt():
         '<p class="Texto_Justificado">Nota 2: Fonte do segundo.</p>',
     ]
     assert any("seção Notas" in aviso for aviso in res.avisos)
+
+
+@pytest.mark.parametrize('propriedade,tag', [('bold', 'strong'), ('italic', 'em'), ('underline', 'u')])
+def test_estilo_de_caractere_preserva_enfase_e_respeita_desativacao(propriedade, tag):
+    from docx.enum.style import WD_STYLE_TYPE
+
+    doc = docx.Document()
+    base = doc.styles.add_style('Enfase institucional', WD_STYLE_TYPE.CHARACTER)
+    setattr(base.font, propriedade, True)
+    derivado = doc.styles.add_style('Enfase derivada', WD_STYLE_TYPE.CHARACTER)
+    derivado.base_style = base
+    p = doc.add_paragraph()
+    p.add_run('Herdado').style = derivado
+    desligado = p.add_run(' Desligado')
+    desligado.style = derivado
+    setattr(desligado.font, propriedade, False)
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    corpo = '\n'.join(converter_docx_para_blocos(buffer.getvalue()))
+    assert f'<{tag}>Herdado</{tag}>' in corpo
+    assert f'<{tag}> Desligado</{tag}>' not in corpo

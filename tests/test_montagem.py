@@ -87,3 +87,16 @@ def test_derivar_caminho_saida():
     assert derivar_caminho_saida("Nota_Tecnica_NT_01.docx") == Path("Nota_Tecnica_SEI_NT_01.html")
     assert derivar_caminho_saida("Nota_Tecnica_Revisada_NT_02.docx") == Path("Nota_Tecnica_SEI_NT_02.html")
     assert derivar_caminho_saida("doc.docx", so_corpo=True) == Path("doc_SEI_corpo.html")
+
+
+def test_limpeza_apaga_so_partes_numeradas_do_nome_literal(tmp_path):
+    saida = tmp_path / 'nota[1]_SEI.html'
+    antigos = [tmp_path / f'nota[1]_SEI_parte{n}.html' for n in ('01', '123')]
+    preservados = [tmp_path / nome for nome in (
+        'nota[1]_SEI_parte_revisada.html', 'nota1_SEI_parte01.html',
+        'nota[1]_SEI_parte01_backup.html', 'nota[1]_SEI_parte1.html',
+    )]
+    for arquivo in antigos + preservados:
+        arquivo.write_text('conteudo', encoding='utf-8')
+    assert sorted(apagar_partes_antigas(saida)) == sorted(antigos)
+    assert all(p.is_file() for p in preservados)

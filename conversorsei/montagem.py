@@ -3,6 +3,7 @@ montagem.py — Monta o HTML institucional de saída e decide o nome do arquivo 
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from conversorsei.recursos import obter_estilos_sei
@@ -78,7 +79,10 @@ def apagar_partes_antigas(saida: str | Path) -> list[Path]:
     """
     caminho = Path(saida)
     removidos: list[Path] = []
-    for f in caminho.parent.glob(f"{caminho.stem}_parte*{caminho.suffix}"):
+    padrao = re.compile(rf"{re.escape(caminho.stem)}_parte\d{{2,}}{re.escape(caminho.suffix)}")
+    for f in caminho.parent.iterdir():
+        if not padrao.fullmatch(f.name) or not f.is_file() or f.is_symlink():
+            continue
         try:
             f.unlink()
             removidos.append(f)

@@ -737,14 +737,15 @@ def run_para_html(doc: DocumentoWord, run_el, p: Paragraph, estilos_do_paragrafo
     if texto:
         t = esc(texto).replace("\n", "<br />")
         rPr = run_el.find(qn("w:rPr"))
-        b = run.bold
-        i = run.italic
-        u = run.underline
         # Lê o valor efetivo, com a herança dos estilos: <w:strike w:val="0"/> desliga o
         # riscado (o Word grava assim ao desmarcar), e um estilo riscado risca o run
         if estilos_do_paragrafo is None:
             estilos_do_paragrafo = _estilos_do_paragrafo(p)
-        strike = bool(_primeiro_definido(_fontes_do_run(run, estilos_do_paragrafo), lambda f: f.strike))
+        fontes = _fontes_do_run(run, estilos_do_paragrafo)
+        b = _primeiro_definido(fontes, lambda f: f.bold)
+        i = _primeiro_definido(fontes, lambda f: f.italic)
+        u = _primeiro_definido(fontes, lambda f: f.underline)
+        strike = bool(_primeiro_definido(fontes, lambda f: f.strike))
         cor = None
         if rPr is not None:
             c = rPr.find(qn("w:color"))
@@ -1012,6 +1013,9 @@ def converter_paragrafo(
 def larguras_percentuais(tbl: Table) -> list[float]:
     """Larguras das colunas da grade em %, a partir do tblGrid (twips)."""
     try:
+        explicitas = tbl._tbl.tblPr.get("{urn:conversorsei}larguras")
+        if explicitas:
+            return [float(c) for c in explicitas.split(",")]
         cols = tbl._tbl.tblGrid.findall(qn("w:gridCol"))
         ws = [int(c.get(qn("w:w")) or 0) for c in cols]
         total = sum(ws) or 1
@@ -1203,7 +1207,7 @@ def converter_tabela(
         if linha:
             linhas_html.append(linha)
 
-    if colunas_iguais(pct):
+    if colunas_iguais(pct) and not tbl._tbl.tblPr.get("{urn:conversorsei}larguras"):
         pct = larguras_pelo_conteudo(linhas_html, len(pct))
     # A largura vai só na primeira linha, que fixa as colunas da tabela inteira
     for cel in (c for linha in linhas_html for c in linha if c["row"] == 0):

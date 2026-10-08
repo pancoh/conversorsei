@@ -43,6 +43,7 @@ from conversorsei.md_converter import (
     linha_com_classe,
     linha_de_assinatura,
     marcar_colunas_mescladas,
+    marcar_larguras_tabela,
     riscar_inteiro,
 )
 
@@ -251,6 +252,15 @@ def _estilo(no: No) -> dict[str, str]:
         if valor.strip():
             propriedades[nome.strip().lower()] = valor.strip().lower()
     return propriedades
+
+
+def percentual_do_no(no: No) -> float | None:
+    """Só medidas relativas podem seguir para o SEI sem depender da tela de origem."""
+    valor = no.attrs.get("width") or _estilo(no).get("width", "")
+    if not re.fullmatch(r"\s*\d+(?:\.\d+)?%\s*", valor):
+        return None
+    percentual = float(valor.strip()[:-1])
+    return percentual if 0 < percentual <= 100 else None
 
 
 def alinhamento_do_no(no: No) -> str | None:
@@ -479,7 +489,10 @@ class LeitorHtml:
         codigo = self._literal(no).replace("\r\n", "\n").strip("\n")
         if not codigo.strip():
             return
-        self.linhas.extend(["```", *codigo.split("\n"), "```"])
+        # A cerca precisa ser maior que qualquer sequência de crases do conteúdo.
+        tamanho = max((len(m.group()) + 1 for m in re.finditer(r"`+", codigo)), default=3)
+        cerca = "`" * max(3, tamanho)
+        self.linhas.extend([cerca, *codigo.split("\n"), cerca])
         self._registrar()
         self.linhas.append("")
 
@@ -598,6 +611,20 @@ class LeitorHtml:
         md = [[self._celula(c) for c in linha] for linha in celulas]
         if not any(texto for linha in md for texto in linha):
             return
+        largura = percentual_do_no(tabela) or 100.0
+        colunas: list[float] = []
+        for celula in celulas[0]:
+            percentual = percentual_do_no(celula)
+            if percentual is None:
+                colunas = []
+                break
+            try:
+                span = max(1, int(celula.attrs.get("colspan") or 1))
+            except ValueError:
+                span = 1
+            colunas.extend([percentual / span] * span)
+        if largura != 100 or colunas:
+            self.linhas.append(marcar_larguras_tabela(largura, colunas))
         self.linhas.append("| " + " | ".join(md[0]) + " |")
         self.linhas.append("| " + " | ".join(["---"] * max(len(linha) for linha in md)) + " |")
         self.linhas.extend("| " + " | ".join(linha) + " |" for linha in md[1:])

@@ -45,6 +45,9 @@ MARCA_QUEBRA_ODT = "\ue000"
 # caracteres de uso privado. Só marcar_colunas_mescladas escreve a marca, e só
 # colunas_mescladas a lê
 RE_COLUNA_MESCLADA_ODT = re.compile(r"^\ue001(\d+)\ue002")
+# As medidas atravessam o Markdown interno sem virar texto do documento.
+RE_LARGURAS_TABELA = re.compile(r"^\ue003(\d+(?:\.\d+)?);((?:\d+(?:\.\d+)?(?:,\d+(?:\.\d+)?)*)?)\ue004$")
+ATRIBUTO_LARGURAS_TABELA = "{urn:conversorsei}larguras"
 # A nota só conta pela definição ("[^1]: texto" no início da linha): a chamada solta
 # confunde-se com texto comum, como a expressão "[^0-9]"
 RE_NOTA_MD = re.compile(r"^\s{0,3}\[\^[^\]\s]+\]:")
@@ -77,7 +80,7 @@ RE_SENTINELA = re.compile(rf"{SENTINELA}(\d+){SENTINELA}")
 # HTML, então um asterisco ou colchete do documento seria lido como marcação
 # ("*cautela*" virava itálico). A barra invertida é o escape que format_paragraph desfaz
 # ao escrever o run.
-RE_MARCACAO_MD = re.compile(r"([*\[\]`~])")
+RE_MARCACAO_MD = re.compile(r"([\\*\[\]`~])")
 RE_ABERTURA_DE_BLOCO_MD = re.compile(r"^([#>|+*-])")
 
 
@@ -99,6 +102,20 @@ def colunas_mescladas(celula: str) -> tuple[int, str]:
     return (int(m.group(1)), celula[m.end() :]) if m else (1, celula)
 
 
+def marcar_larguras_tabela(largura: float, colunas: list[float]) -> str:
+    """Medidas já escolhidas no HTML não devem ser recalculadas pelo conteúdo."""
+    return f"\ue003{largura};{','.join(str(c) for c in colunas)}\ue004"
+
+
+def aplicar_larguras_tabela(table, largura: float, colunas: list[float]) -> None:
+    tblW = table._tbl.tblPr.find(qn("w:tblW"))
+    if tblW is not None:
+        tblW.set(qn("w:type"), "pct")
+        tblW.set(qn("w:w"), str(round(largura * 50)))
+    if len(colunas) == len(table.columns) and all(c > 0 for c in colunas) and abs(sum(colunas) - 100) <= 0.5:
+        table._tbl.tblPr.set(ATRIBUTO_LARGURAS_TABELA, ",".join(str(c) for c in colunas))
+
+
 def desescapar_markdown(texto: str) -> str:
     r"""Texto como o leitor o vê: sem as barras de escape ("1\." vira "1.").
 
@@ -116,7 +133,10 @@ def texto_sem_marcacao(texto: str) -> str:
     A quebra de linha do ODT volta a ser quebra, porque conta como linha da citação.
     """
     partes = parse_markdown_inline(proteger_escapes(texto))
-    simples = "".join(p[2] if p[0] == "link" else p[1] for p in partes)
+    simples = "".join(
+        "".join(t[1] for t in _split_emphasis(p[2])) if p[0] == "link" else p[1]
+        for p in partes
+    )
     return restaurar_escapes(simples).replace(MARCA_QUEBRA_ODT, "\n")
 
 
@@ -164,41 +184,45 @@ def aplicar_bordas_tabela(table) -> None:
     tblPr.append(borders)
 
 
-def adicionar_hiperlink(paragraph, url: str, text: str, riscado: bool = False) -> None:
-    """Adiciona um hyperlink real (Calibri 11) ao parágrafo do docx.
-
-    Sem cor nem sublinhado no run: o docx_converter levaria os dois para o HTML como
-    <span style="color"> e <u>, e o link do Markdown, do ODT e do HTML sairia diferente do
-    link do Word, que tem a aparência pelo estilo. Quem desenha o link é o editor do SEI.
-    """
-    part = paragraph.part
-    r_id = part.relate_to(url, RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
-
+def adicionar_hiperlink(
+    paragraph, url: str, text: str, riscado: bool = False,
+    negrito: bool = False, italico: bool = False, cor: str | None = None,
+) -> None:
+    """Preserva a ênfase do rótulo sem acrescentar cor ou sublinhado de link."""
+    r_id = paragraph.part.relate_to(url, RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
     hyperlink = OxmlElement("w:hyperlink")
     hyperlink.set(qn("r:id"), r_id)
-
-    new_run = OxmlElement("w:r")
-    rPr = OxmlElement("w:rPr")
-    rFonts = OxmlElement("w:rFonts")
-    rFonts.set(qn("w:ascii"), "Calibri")
-    rFonts.set(qn("w:hAnsi"), "Calibri")
-    rPr.append(rFonts)
-    sz = OxmlElement("w:sz")
-    sz.set(qn("w:val"), "22")
-    rPr.append(sz)
-    if riscado:
-        rPr.append(OxmlElement("w:strike"))
-    new_run.append(rPr)
-
-    # A quebra de linha do ODT dentro do link vira <w:br/> no próprio run, como no texto comum
-    for indice, trecho in enumerate(text.split(MARCA_QUEBRA_ODT)):
-        if indice:
-            new_run.append(OxmlElement("w:br"))
-        t = OxmlElement("w:t")
-        t.set(qn("xml:space"), "preserve")
-        t.text = trecho
-        new_run.append(t)
-    hyperlink.append(new_run)
+    partes = _split_emphasis(text, cor, negrito, italico, riscado)
+    if partes and not "".join(p[1] for p in partes).strip():
+        # Rótulo sem texto visível continua mostrando a URL, com a ênfase escolhida.
+        partes = [("text", url, partes[0][2], partes[0][3], partes[0][4], partes[0][5])]
+    for _, trecho, forte, enfase, cor_trecho, risco in partes:
+        new_run = OxmlElement("w:r")
+        rPr = OxmlElement("w:rPr")
+        rFonts = OxmlElement("w:rFonts")
+        rFonts.set(qn("w:ascii"), "Calibri")
+        rFonts.set(qn("w:hAnsi"), "Calibri")
+        rPr.append(rFonts)
+        sz = OxmlElement("w:sz")
+        sz.set(qn("w:val"), "22")
+        rPr.append(sz)
+        for nome, ligado in (("b", forte), ("i", enfase), ("strike", risco)):
+            marca = OxmlElement(f"w:{nome}")
+            marca.set(qn("w:val"), "1" if ligado else "0")
+            rPr.append(marca)
+        if cor_trecho:
+            marca_cor = OxmlElement("w:color")
+            marca_cor.set(qn("w:val"), cor_trecho)
+            rPr.append(marca_cor)
+        new_run.append(rPr)
+        for indice, linha in enumerate(restaurar_escapes(trecho).split(MARCA_QUEBRA_ODT)):
+            if indice:
+                new_run.append(OxmlElement("w:br"))
+            t = OxmlElement("w:t")
+            t.set(qn("xml:space"), "preserve")
+            t.text = linha
+            new_run.append(t)
+        hyperlink.append(new_run)
     paragraph._p.append(hyperlink)
 
 
@@ -216,16 +240,25 @@ def parse_markdown_inline(text: str) -> list[tuple]:
 
 
 def _parse_links_emphasis(text: str, color: str | None) -> list[tuple]:
-    segments = []
-    pos = 0
-    for m in RE_LINK.finditer(text):
-        if m.start() > pos:
-            segments.extend(_split_emphasis(text[pos : m.start()], color))
-        rotulo = (m.group(1) or "").strip() or m.group(2)
-        segments.append(("link", m.group(2), rotulo))
-        pos = m.end()
-    if pos < len(text):
-        segments.extend(_split_emphasis(text[pos:], color))
+    # O endereço não passa pela leitura da ênfase, mas as marcas ao redor do link passam.
+    links: list[tuple[str, str]] = []
+
+    def guardar_link(m: re.Match) -> str:
+        links.append((m.group(2), (m.group(1) or "").strip() or m.group(2)))
+        return f"\ue005{len(links) - 1}\ue006"
+
+    protegido = RE_LINK.sub(guardar_link, text)
+    segments: list[tuple] = []
+    for _, trecho, negrito, italico, cor, riscado in _split_emphasis(protegido, color):
+        posicao = 0
+        for marca in re.finditer(r"\ue005(\d+)\ue006", trecho):
+            if marca.start() > posicao:
+                segments.append(("text", trecho[posicao:marca.start()], negrito, italico, cor, riscado))
+            url, rotulo = links[int(marca.group(1))]
+            segments.append(("link", url, rotulo, negrito, italico, cor, riscado))
+            posicao = marca.end()
+        if posicao < len(trecho):
+            segments.append(("text", trecho[posicao:], negrito, italico, cor, riscado))
     return segments
 
 
@@ -369,15 +402,10 @@ def format_paragraph(
 
     for seg in parse_markdown_inline(clean_text):
         if seg[0] == "link":
-            _, url, rotulo = seg
-            # O rótulo não passa pela leitura de ênfase: "[~~Decreto~~](url)" deixaria os
-            # "~~" no texto do link. Rótulo todo riscado vira link riscado
-            rotulo_riscado = texto_inteiro_riscado(rotulo)
-            if rotulo_riscado:
-                # Sem as marcas, um rótulo só de espaço deixaria o link invisível: vale a URL
-                rotulo = rotulo.replace("~~", "").strip() or url
+            _, url, rotulo, negrito, italico, cor, riscado = seg
             adicionar_hiperlink(
-                p, restaurar_escapes(url), restaurar_escapes(rotulo), riscado_inteiro or rotulo_riscado
+                p, restaurar_escapes(url), rotulo, riscado_inteiro or riscado,
+                negrito, italico, cor,
             )
             continue
 
@@ -519,12 +547,14 @@ def linha_inteira_riscada(linha: str) -> bool:
 
 
 def neutralizar_marcacao_estendida(linha: str) -> str:
-    """Escapa ">", "```" e "~~" para que fiquem como texto.
+    """Escapa a barra invertida, ">", "```" e "~~" para que fiquem como texto.
 
     Serve ao .txt, que passa pelo mesmo caminho do Markdown mas não é Markdown: em texto
     comum, "> 18 anos" ou uma resposta de e-mail citada não são citação, e "~~" não risca.
+    A barra invertida é caractere do texto ("C:\\dados\\(2026)"), e não escape: sem dobrá-la
+    antes dos outros escapes, ela sumiria antes da pontuação.
     """
-    linha = linha.replace("~", "\\~")
+    linha = linha.replace("\\", "\\\\").replace("~", "\\~")
     corpo = linha.lstrip()
     if corpo.startswith((">", "```")):
         linha = linha[: len(linha) - len(corpo)] + "\\" + corpo
@@ -541,7 +571,9 @@ def parse_table_markdown(lines: list[str], start_idx: int) -> tuple[list[list[st
             idx += 1
             continue
 
-        cells = [c.strip() for c in line.split("|")[1:-1]]
+        # Protege os escapes antes de dividir: uma barra literal na célula não é coluna.
+        cells = [c.strip() for c in proteger_escapes(line).split("|")[1:-1]]
+        cells = [RE_SENTINELA.sub(lambda m: "\\" + chr(int(m.group(1))), c) for c in cells]
         if cells:
             table_data.append(cells)
         idx += 1
@@ -634,12 +666,22 @@ def montar_docx_de_markdown(conteudo: str, estendido: bool = True, extraido: boo
     # A linha de tis só é separador onde "~" é marcação; no .txt, ela é texto
     separador = r"[-–—*_~]{3,}" if estendido else r"[-–—*_]{3,}"
     i = 0
+    larguras_tabela: tuple[float, list[float]] | None = None
 
     while i < len(lines):
         line = lines[i].strip()
         if not line:
             i += 1
             continue
+        medidas = RE_LARGURAS_TABELA.fullmatch(line)
+        if medidas:
+            largura = float(medidas.group(1))
+            colunas = [float(c) for c in medidas.group(2).split(",") if c]
+            larguras_tabela = (largura, colunas)
+            i += 1
+            continue
+        if not line.startswith("|"):
+            larguras_tabela = None
 
         fim = fim_do_bloco_de_codigo(lines, i)
         if fim is not None:
@@ -726,6 +768,9 @@ def montar_docx_de_markdown(conteudo: str, estendido: bool = True, extraido: boo
             if table_data:
                 cols_cnt = max(sum(colunas_mescladas(celula)[0] for celula in row) for row in table_data)
                 table = doc.add_table(rows=len(table_data), cols=cols_cnt)
+                if larguras_tabela is not None:
+                    aplicar_larguras_tabela(table, *larguras_tabela)
+                    larguras_tabela = None
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
                 aplicar_bordas_tabela(table)
 

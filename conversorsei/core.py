@@ -231,6 +231,7 @@ def converter_documento(
     validar: bool = True,
     citacao_por_recuo: bool = False,
     omitir_cabecalho: bool = False,
+    destinos_reservados: dict[Path, Path] | None = None,
 ) -> ResultadoConversao:
     """Converte um documento (DOCX, PDF, ODT, HTML, MD, TXT) num HTML formatado para o SEI.
 
@@ -271,12 +272,25 @@ def converter_documento(
     else:
         saida_base = derivar_caminho_saida(p_in, so_corpo=so_corpo, outdir=outdir)
 
+    destino = saida_base.resolve()
+    origem = p_in.resolve()
+    outra_origem = (destinos_reservados or {}).get(destino)
+    if destino == origem or (outra_origem is not None and outra_origem != origem):
+        resultado.sucesso = False
+        resultado.erros.append(
+            f"A saída {saida_base} coincide com "
+            + ("o arquivo de entrada. " if destino == origem else f"a saída de {outra_origem}. ")
+            + "Use --saida para escolher outro nome ou converta para outra pasta."
+        )
+        return resultado
     saida_base.parent.mkdir(parents=True, exist_ok=True)
 
     nome, conteudo = montar_saida(blocos, nome_base=saida_base.stem, sufixo=saida_base.suffix, so_corpo=so_corpo)
     apagar_partes_antigas(saida_base)
     caminho = saida_base.parent / nome
     caminho.write_text(conteudo, encoding="utf-8")
+    if destinos_reservados is not None:
+        destinos_reservados[destino] = origem
     resultado.arquivos_gerados = [caminho]
 
     if validar:
@@ -408,6 +422,7 @@ def converter_diretorio(
     validar: bool = True,
     citacao_por_recuo: bool = False,
     omitir_cabecalho: bool = False,
+    destinos_reservados: dict[Path, Path] | None = None,
 ) -> list[ResultadoConversao]:
     """Varre um diretório e converte todos os documentos compatíveis encontrados."""
     p_dir = Path(diretorio)
@@ -418,6 +433,8 @@ def converter_diretorio(
     arquivos = sorted(f for f in p_dir.glob(padrao) if f.is_file() and entra_na_varredura(f))
 
     resultados = []
+    if destinos_reservados is None:
+        destinos_reservados = {}
     for arq in arquivos:
         destino_pasta = None
         if outdir is not None:
@@ -432,6 +449,7 @@ def converter_diretorio(
             validar=validar,
             citacao_por_recuo=citacao_por_recuo,
             omitir_cabecalho=omitir_cabecalho,
+            destinos_reservados=destinos_reservados,
         )
         resultados.append(res)
 

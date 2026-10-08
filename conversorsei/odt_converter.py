@@ -391,7 +391,10 @@ def _linha_de_tabela(
         textos = [texto_do_no(p, estilos, notas).strip() for p in celula.findall(_q("text", "p"))]
         # A barra vertical é o separador da tabela Markdown e não pode vir do conteúdo
         texto = " ".join(t for t in textos if t).replace("|", r"\|")
-        celulas.append(marcar_colunas_mescladas(texto, _colunas_da_celula(celula)))
+        celulas.extend(
+            [marcar_colunas_mescladas(texto, _colunas_da_celula(celula))]
+            * int(celula.get(_q("table", "number-columns-repeated")) or 1)
+        )
     return "| " + " | ".join(celulas) + " |"
 
 
@@ -409,9 +412,14 @@ def tabela_para_markdown(
 
     saida = [_linha_de_tabela(linhas[0], estilos, notas)]
     # Contadas no XML, e não no texto gerado: ali um "\|" do conteúdo pareceria coluna
-    colunas = sum(_colunas_da_celula(celula) for celula in linhas[0].findall(_q("table", "table-cell")))
+    colunas = sum(
+        _colunas_da_celula(celula) * int(celula.get(_q("table", "number-columns-repeated")) or 1)
+        for celula in linhas[0].findall(_q("table", "table-cell"))
+    )
     saida.append("| " + " | ".join(["---"] * max(colunas, 1)) + " |")
-    saida.extend(_linha_de_tabela(linha, estilos, notas) for linha in linhas[1:])
+    for indice, linha in enumerate(linhas):
+        repeticoes = int(linha.get(_q("table", "number-rows-repeated")) or 1) - (indice == 0)
+        saida.extend(_linha_de_tabela(linha, estilos, notas) for _ in range(repeticoes))
     return saida
 
 

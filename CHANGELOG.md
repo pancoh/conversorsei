@@ -5,6 +5,17 @@ numeração segue o padrão 0.X.Y: X sobe com recurso novo, e Y com correção.
 
 ## Em desenvolvimento
 
+- **Saída em lote protegida.** Na linha de comando, documentos que gerariam o mesmo arquivo
+  recebem um aviso de erro, sem sobrescrever a primeira saída. O modo watch conserva as
+  subpastas de entrada. A limpeza das partes antigas apaga apenas arquivos com a numeração
+  das partes, e a saída não pode substituir o próprio documento de entrada.
+- **Tabelas preservadas.** Uma barra vertical no texto da célula deixa de criar uma coluna
+  extra. Células e linhas repetidas do LibreOffice são incorporadas. As larguras da tabela
+  e das colunas em HTML são mantidas ao converter novamente.
+- **Texto e formatação.** Barras invertidas literais ficam no texto de .txt, HTML, ODT
+  e PDF. Links mantêm negrito, itálico e riscado. O Word preserva a ênfase dos estilos de
+  caractere. Blocos de código em HTML podem conter linhas de crases sem serem interrompidos.
+
 ## 0.7.0 (2026-10-08)
 
 - **Travessões preservados.** O travessão e a meia-risca ficam no texto em todos os formatos,

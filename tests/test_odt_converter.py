@@ -204,3 +204,32 @@ def test_odt_cabecalho_com_barra_escapada_nao_ganha_coluna(tmp_path):
     markdown = extrair_markdown_odt(_odt(tmp_path, conteudo))
     separador = next(linha for linha in markdown.splitlines() if linha.startswith("| ---"))
     assert separador.count("---") == 2
+
+
+def test_barra_vertical_da_tabela_odt_atravessa_o_pipeline(tmp_path):
+    conteudo = CONTENT_XML.replace('<text:p>Parametro</text:p>', '<text:p>Entrada | saída</text:p>')
+    res = converter_documento(_odt(tmp_path, conteudo), outdir=tmp_path / 'saida')
+    assert res.sucesso, res.erros
+    html = res.arquivos_gerados[0].read_text(encoding='utf-8')
+    assert html.count('<td ') == 4
+    assert '>Entrada | saída<' in html
+
+
+def test_odt_expande_celulas_e_linhas_repetidas(tmp_path):
+    conteudo = CONTENT_XML.replace('<table:table-row>', '<table:table-row table:number-rows-repeated="2">', 1)
+    conteudo = conteudo.replace('<table:table-cell><text:p>Parametro', '<table:table-cell table:number-columns-repeated="3"><text:p>Parametro', 1)
+    res = converter_documento(_odt(tmp_path, conteudo), outdir=tmp_path / 'saida')
+    assert res.sucesso, res.erros
+    html = res.arquivos_gerados[0].read_text(encoding='utf-8')
+    assert html.count('<tr>') == 3
+    assert html.count('Parametro') == 6
+    assert html.count('Situacao') == 2
+    assert html.count('<td ') == 12
+
+
+def test_odt_preserva_barra_invertida_antes_de_pontuacao(tmp_path):
+    texto = r'C:\dados\(2026) e \d+\.'
+    conteudo = CONTENT_XML.replace('Asterisco * e colchete [Lei] nao viram marcacao.', texto)
+    res = converter_documento(_odt(tmp_path, conteudo), outdir=tmp_path / 'saida')
+    assert res.sucesso, res.erros
+    assert texto in res.arquivos_gerados[0].read_text(encoding='utf-8')

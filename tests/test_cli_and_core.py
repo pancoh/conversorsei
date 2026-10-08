@@ -325,3 +325,58 @@ def test_cli_sem_cabecalho_omite_e_informa(tmp_path, capsys):
     assert main([str(entrada), "-o", str(saida)]) == 0
     assert "cabeçalho:" not in capsys.readouterr().out
     assert "NOTA TÉCNICA" in (saida / "nota_SEI.html").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize('nomes', [('nota.md', 'nota.txt'), ('Nota_Tecnica_12.md', 'Nota_Tecnica_Revisada_12.txt')])
+def test_lote_recusa_destinos_coincidentes_sem_apagar_a_primeira_saida(tmp_path, nomes):
+    for indice, nome in enumerate(nomes):
+        (tmp_path / nome).write_text(f'Texto do documento {indice}.', encoding='utf-8')
+    resultados = converter_diretorio(tmp_path, outdir=tmp_path / 'saida')
+    assert [r.sucesso for r in resultados] == [True, False]
+    assert 'coincide' in resultados[1].erros[0]
+    conteudo = resultados[0].arquivos_gerados[0].read_text(encoding='utf-8')
+    assert 'Texto do documento 0.' in conteudo
+    assert 'Texto do documento 1.' not in conteudo
+
+
+def test_cli_controla_colisoes_entre_alvos_independentes(tmp_path, capsys):
+    entradas = [tmp_path / nome for nome in ('nota.md', 'nota.txt')]
+    for indice, entrada in enumerate(entradas):
+        entrada.write_text(f'Documento {indice}.', encoding='utf-8')
+    assert main([*(str(e) for e in entradas), '-o', str(tmp_path / 'saida'), '--json']) == 1
+    assert [r['sucesso'] for r in json.loads(capsys.readouterr().out)] == [True, False]
+
+
+def test_saida_explicita_nao_pode_substituir_a_entrada(tmp_path):
+    entrada = tmp_path / 'original.html'
+    texto = '<p>Texto original.</p>'
+    entrada.write_text(texto, encoding='utf-8')
+    resultado = converter_documento(entrada, caminho_saida=entrada)
+    assert not resultado.sucesso
+    assert entrada.read_text(encoding='utf-8') == texto
+
+
+def test_watch_conserva_subpastas_e_controla_colisoes(tmp_path, monkeypatch, capsys):
+    import conversorsei.cli as cli
+
+    entrada = tmp_path / 'entrada'
+    for pasta in ('um', 'dois'):
+        subpasta = entrada / pasta
+        subpasta.mkdir(parents=True)
+        (subpasta / 'nota.md').write_text(f'Documento {pasta}.', encoding='utf-8')
+    (entrada / 'um' / 'nota.txt').write_text('Outra origem.', encoding='utf-8')
+    chamadas = 0
+
+    def encerrar(_segundos):
+        nonlocal chamadas
+        chamadas += 1
+        if chamadas == 2:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli.time, 'sleep', encerrar)
+    saida = tmp_path / 'saida'
+    assert main([str(entrada), '-r', '-w', '-o', str(saida)]) == 0
+    for pasta in ('um', 'dois'):
+        assert f'Documento {pasta}.' in (saida / pasta / 'nota_SEI.html').read_text(encoding='utf-8')
+    assert 'coincide' in capsys.readouterr().err
+    assert not (saida / 'nota_SEI.html').exists()

@@ -22,6 +22,17 @@ from conversorsei.core import (
 INTERVALO_WATCH_PADRAO = 2.0
 
 
+def pasta_de_destino(caminho: Path, alvos: list[str], outdir: Path | None) -> Path | None:
+    """O watch conserva as subpastas, como a conversão de diretório."""
+    if outdir is None:
+        return None
+    for alvo in alvos:
+        raiz = Path(alvo)
+        if raiz.is_dir() and caminho.is_relative_to(raiz):
+            return outdir / caminho.parent.relative_to(raiz)
+    return outdir
+
+
 def arquivos_observaveis(alvos: list[str], recursivo: bool) -> dict[Path, tuple[int, int]]:
     """Mapeia cada arquivo suportado sob os alvos para a sua marca de modificação."""
     estado: dict[Path, tuple[int, int]] = {}
@@ -131,18 +142,20 @@ def observar(args: argparse.Namespace, alvos: list[str], outdir: Path | None, va
     print(f"Observando {', '.join(alvos)} a cada {args.intervalo:g}s. Ctrl+C encerra.", flush=True)
     convertidos: dict[Path, tuple[int, int]] = {}
     pendentes: dict[Path, tuple[int, int]] = {}
+    destinos_reservados: dict[Path, Path] = {}
 
     try:
         while True:
             for caminho in ciclo_de_observacao(alvos, args.recursivo, convertidos, pendentes):
                 res = converter_documento(
                     caminho_entrada=caminho,
-                    outdir=outdir,
+                    outdir=pasta_de_destino(caminho, alvos, outdir),
                     so_corpo=args.corpo,
                     max_nivel=args.max_nivel,
                     validar=validar,
                     citacao_por_recuo=args.citacao_por_recuo,
                     omitir_cabecalho=args.sem_cabecalho,
+                    destinos_reservados=destinos_reservados,
                 )
                 hora = datetime.now().strftime("%H:%M:%S")
                 if res.sucesso:
@@ -309,6 +322,7 @@ def main(argv: list[str] | None = None) -> int:
 
     resultados = []
     total_erros = 0
+    destinos_reservados: dict[Path, Path] = {}
 
     if um_arquivo and args.saida:
         res = converter_documento(
@@ -339,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
                     validar=validar,
                     citacao_por_recuo=args.citacao_por_recuo,
                     omitir_cabecalho=args.sem_cabecalho,
+                    destinos_reservados=destinos_reservados,
                 )
                 resultados.extend(res_dir)
             elif p_alvo.is_file():
@@ -358,6 +373,7 @@ def main(argv: list[str] | None = None) -> int:
                     validar=validar,
                     citacao_por_recuo=args.citacao_por_recuo,
                     omitir_cabecalho=args.sem_cabecalho,
+                    destinos_reservados=destinos_reservados,
                 )
                 resultados.append(res)
 

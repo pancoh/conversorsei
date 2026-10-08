@@ -321,3 +321,57 @@ def test_html_link_com_esquema_inseguro_fica_so_o_texto():
         '<a href="mailto:sei@gov.br">três</a></p>'
     )
     assert markdown.strip() == "um dois [três](mailto:sei@gov.br)"
+
+
+def test_barra_vertical_na_celula_nao_cria_coluna():
+    res = _converter('<table><tr><td>A | B</td><td>C</td></tr></table>')
+    corpo = _corpo(res['arquivos'][0]['conteudo'])
+    assert corpo.count('<td ') == 2
+    assert '>A | B<' in corpo
+    assert '>C<' in corpo
+
+
+@pytest.mark.parametrize('texto', [r'C:\dados\(2026)', r'Regex: \d+\.', r'Literal: \* e \\ e \[texto]'])
+def test_html_preserva_barras_invertidas_literais(texto):
+    corpo = _corpo(_converter(f'<p>{texto}</p>')['arquivos'][0]['conteudo'])
+    assert texto in corpo
+
+
+@pytest.mark.parametrize('html,esperado', [
+    ('<strong><a href="https://exemplo.org">Texto</a></strong>', '<strong>Texto</strong>'),
+    ('<a href="https://exemplo.org"><strong>Texto</strong></a>', '<strong>Texto</strong>'),
+    ('<em><a href="https://exemplo.org">Texto</a></em>', '<em>Texto</em>'),
+    ('<a href="https://exemplo.org">Antes <strong>Texto</strong> depois</a>', 'Antes <strong>Texto</strong> depois'),
+    ('<strong><a href="https://exemplo.org"><em>Texto</em></a></strong>', '<strong><em>Texto</em></strong>'),
+])
+def test_enfase_do_link_atravessa_a_conversao(html, esperado):
+    corpo = _corpo(_converter(f'<p>{html}</p>')['arquivos'][0]['conteudo'])
+    assert f'<a href="https://exemplo.org">{esperado}</a>' in corpo
+    assert '**' not in corpo
+
+
+def test_larguras_da_tabela_e_colunas_sobrevivem_a_reconversao():
+    from conversorsei.core import converter_bytes
+
+    html = '<table width="50%"><tr><td width="20%">A</td><td width="80%">B</td></tr><tr><td>C</td><td>D</td></tr></table>'
+    ida = converter_bytes('tabela.html', html.encode(), so_corpo=True)
+    corpo = ida.arquivos[0].conteudo
+    assert 'width="50%"' in corpo
+    assert 'width="20.0%"' in corpo and 'width="80.0%"' in corpo
+    volta = converter_bytes('volta.html', corpo.encode(), so_corpo=True)
+    assert volta.arquivos[0].conteudo == corpo
+
+
+def test_colunas_iguais_explicitas_nao_sao_recalculadas():
+    html = '<table><tr><td width="50%">1</td><td width="50%">Texto muito mais longo</td></tr></table>'
+    corpo = _corpo(_converter(html)['arquivos'][0]['conteudo'])
+    assert corpo.count('width="50.0%"') == 2
+
+
+def test_codigo_html_com_crases_internas_mantem_o_bloco_inteiro():
+    texto = 'primeira\n```\nultima\n````'
+    ida = _converter(f'<pre>{texto}</pre>')
+    corpo = _corpo(ida['arquivos'][0]['conteudo'])
+    assert '<p class="Texto_Mono_Espaçado">primeira<br />```<br />ultima<br />````</p>' in corpo
+    volta = _converter(ida['arquivos'][0]['conteudo'])
+    assert _corpo(volta['arquivos'][0]['conteudo']) == corpo
